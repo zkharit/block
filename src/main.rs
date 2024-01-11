@@ -1,6 +1,6 @@
 mod wallet;
 
-pub use crate::wallet::Wallet::Wallet;
+use wallet::Wallet;
 fn main() {
     // Test Vectors:
     // Test secret key found on: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
