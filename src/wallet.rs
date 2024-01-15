@@ -3,13 +3,16 @@ use rand_core::OsRng;
 use ripemd::Ripemd160;
 use sha2::{Sha256, Digest};
 
+use crate::transaction::Transaction;
+
 pub struct Wallet {
     private_key: elliptic_curve::SecretKey<Secp256k1>,
     public_key: elliptic_curve::PublicKey<Secp256k1>,
-    address: String,
+    address: Vec<u8>,
     signing_key: k256::ecdsa::SigningKey,
     verifying_key: k256::ecdsa::VerifyingKey,
-    wif_private_key: String,
+    wif_private_key: Vec<u8>,
+    nonce: u64
 }
 
 impl Wallet {
@@ -23,14 +26,17 @@ impl Wallet {
     const WIF_VERSION1_PREFIX_BYTES: &'static [u8; 1] = &[0x80];
     // suffix version bytes for signaling that the exported private key in WIF format was used to derive its address from a compressed public key
     const WIF_VERSION1_COMPRESSED_BYTES: &'static [u8; 1] = &[0x01];
+    // version bytes used to indicate transaction version
+    const TRANSACTION_VERSION: &'static u8 = &0x01;
 
     pub fn new() -> Self {
         let private_key: elliptic_curve::SecretKey<Secp256k1> = SecretKey::random(&mut OsRng);
         let public_key: elliptic_curve::PublicKey<Secp256k1> = private_key.public_key();
-        let address: String = Wallet::generate_address(&public_key);
+        let address: Vec<u8> = Wallet::generate_address(&public_key);
         let signing_key: SigningKey = SigningKey::from(&private_key);
         let verifying_key: VerifyingKey = VerifyingKey::from(&public_key);
-        let wif_private_key: String = Wallet::generate_wif_private_key(&private_key, true);
+        let wif_private_key: Vec<u8> = Wallet::generate_wif_private_key(&private_key, true);
+        let nonce: u64 = 0;
         
         Self {
             private_key,
@@ -39,6 +45,7 @@ impl Wallet {
             signing_key,
             verifying_key,
             wif_private_key,
+            nonce,
         }
     }
 
@@ -50,11 +57,11 @@ impl Wallet {
         self.public_key.clone()
     }
 
-    pub fn address(&mut self) -> String {
+    pub fn address(&mut self) -> Vec<u8> {
         self.address.clone()
     }
 
-    pub fn wif_private_key(&mut self) -> String {
+    pub fn wif_private_key(&mut self) -> Vec<u8> {
         self.wif_private_key.clone()
     }
 
@@ -68,10 +75,10 @@ impl Wallet {
 
     // ToDo: what other public functions are needed from a wallet?
 
-    fn sign(&mut self, message: &[u8]) -> Signature{
+    fn sign(&self, message: &[u8]) -> Signature {
         return self.signing_key.sign(message)
     }
-
+  
     // ToDo: Look into error handling
     // not sure if tihs should be in wallet, might be needed in "VerificationEngine" or something like that
     // Verification engine would also be used within Wallet, maybe to verify other transactions & blocks
@@ -85,7 +92,7 @@ impl Wallet {
     // aka who constructs a Transaction? Wallet (cuz it needs to sign it), or Transaction. Maybe something closer to main can constuct the Transaction with Transaction::new(), but then Network uses the wallet to sign it before it is broadcasted?
     // Idk probably want Wallet and Network separated as much as possible
 
-    fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>) -> String {
+    fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>) -> Vec<u8> {
         // block addresses are generated in a similar way to version 1 bitcoin addresses
         // the general process can be found here: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
 
@@ -126,10 +133,10 @@ impl Wallet {
         vec_of_ripe_sha_pub_key.push(second_sha256[3]);
 
         // base58 encode version bytes + ripemd160(sha256(compressed public key)) + first 4 bytes of checksum
-        bs58::encode(vec_of_ripe_sha_pub_key).into_string()
+        bs58::encode(vec_of_ripe_sha_pub_key).into_vec()
     }
 
-    fn generate_wif_private_key(private_key: &elliptic_curve::SecretKey<Secp256k1>, compressed: bool) -> String {
+    fn generate_wif_private_key(private_key: &elliptic_curve::SecretKey<Secp256k1>, compressed: bool) -> Vec<u8> {
         // private keys are encoded in WIF format similar to bitcoin's WIF format
         // the general process can be found here: https://en.bitcoin.it/wiki/Wallet_import_format#Private_key_to_WIF
 
@@ -166,6 +173,6 @@ impl Wallet {
         private_key_vec.push(second_sha256[3]);
 
         // base58 encode version bytes + ripemd160(sha256(compressed public key)) + first 4 bytes of checksum
-        bs58::encode(private_key_vec).into_string()
+        bs58::encode(private_key_vec).into_vec()
     }
 }
