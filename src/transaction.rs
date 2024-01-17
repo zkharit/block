@@ -39,6 +39,10 @@ impl Transaction {
         }
     }
 
+    pub fn from(raw: Vec<u8>) -> Self {
+        bincode::deserialize(&raw).unwrap()
+    }
+
     pub fn serialize_hash_tx(& self) -> Vec<u8> {
         // serialize transaction
         let serialized_tx = self.serialize_tx();
@@ -59,7 +63,7 @@ impl Transaction {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TxMetadata {
     version: u8,
     amount: u64,

@@ -1,9 +1,9 @@
-mod wallet;
-mod transaction;
 mod constants;
+mod transaction;
+mod wallet;
 
-use wallet::Wallet;
 use transaction::Transaction;
+use wallet::Wallet;
 
 fn main() {
     // Test Vectors:
@@ -35,15 +35,25 @@ fn main() {
     println!("");
 
     let tx: Transaction = sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address());
-    
     println!("Transaction:");
     println!("{:X?}", tx);
     println!("");
+
+    let serialized_tx = tx.serialize_tx();
     println!("Serialized Transaction:");
-    println!("{:X?}", tx.serialize_tx());
+    println!("{:X?}", serialized_tx);
     println!("");
+
+    let serialized_hashed_tx = tx.serialize_hash_tx();
     println!("Transaction Hash:");
-    println!("{:X?}", tx.serialize_hash_tx());
+    println!("{:X?}", serialized_hashed_tx);
+    println!("");
+
+    let new_tx = Transaction::from(serialized_tx);
+    println!("Rebuilt Transaction: ");
+    println!("{:X?}", new_tx);
+    println!("");
+
 
     // read config file
     // generate new wallet/restore wallet
