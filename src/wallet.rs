@@ -76,20 +76,9 @@ impl Wallet {
 
     fn create_tx_sig(&mut self, version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Signature {
         // serialize the transaction metadata
-        let serialized_tx_metadata = Self::serialize_tx_metadata(version, amount, fee, recipient, nonce);
-
-        // sha256(serialized transaction metadata)
-        let mut sha256_hasher: Sha256 = Sha256::new();
-        sha256_hasher.update(serialized_tx_metadata);
-        let hashed_serialized_tx_metadata = sha256_hasher.finalize();
+        let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(version, amount, fee, recipient, nonce));
 
         self.sign(&hashed_serialized_tx_metadata)
-    }
-
-    fn serialize_tx_metadata(version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Vec<u8> {
-        // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
-        let tx_metadata = TxMetadata::new(version, amount, fee, recipient, nonce);        
-        bincode::serialize(&tx_metadata).unwrap()
     }
 
     // pub fn save_wallet_file() {

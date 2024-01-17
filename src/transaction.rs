@@ -1,9 +1,10 @@
 use k256::ecdsa::Signature;
 use serde::{Serialize, Deserialize};
+use sha2::{Sha256, Digest};
 
 use crate::constants::BLOCK_ADDRESS_SIZE;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Transaction {
     // transaction version
     version: u8,
@@ -12,8 +13,10 @@ pub struct Transaction {
     // fee in smallest denomination - 0.00000001
     fee: u64,
     // recipeint in address format (base58encoded(version bytes + pubkey + checksum))
+    #[serde(with = "serde_big_array::BigArray")]
     recipient: [u8; BLOCK_ADDRESS_SIZE],
     // sender compressed public key 0x02 or 0x03 (if y is even/odd respesctively) + x point
+    #[serde(with = "serde_big_array::BigArray")]
     sender: [u8; BLOCK_ADDRESS_SIZE],
     // sign(sha256(version + amount + fee + recipient + nonce))
     signature: Signature,
@@ -34,6 +37,11 @@ impl Transaction {
             signature,
             nonce
         }
+    }
+
+    pub fn serialize_tx(& self) -> Vec<u8> {
+        // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
+        bincode::serialize(self).unwrap()
     }
 }
 
@@ -56,5 +64,22 @@ impl TxMetadata {
             recipient,
             nonce,
         }
+    }
+
+    pub fn serialize_tx_metadata(& self) -> Vec<u8> {
+        // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
+        bincode::serialize(self).unwrap()
+    }
+
+    pub fn serialize_hash_tx_metadata(& self) -> Vec<u8> {
+        let serialized_tx_metadata = self.serialize_tx_metadata();
+        self.hash_tx_metadata(serialized_tx_metadata)
+    }
+
+    pub fn hash_tx_metadata(& self, serialized_tx_metadata: Vec<u8>) -> Vec<u8> {
+        // sha256(serialized transaction metadata)
+        let mut sha256_hasher: Sha256 = Sha256::new();
+        sha256_hasher.update(serialized_tx_metadata);
+        sha256_hasher.finalize().to_vec()
     }
 }
