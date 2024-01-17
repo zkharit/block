@@ -4,15 +4,15 @@ use ripemd::Ripemd160;
 use sha2::{Sha256, Digest};
 
 use crate::transaction::{Transaction, TxMetadata};
-use crate::constants::{ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, ADDRESS_SIZE};
+use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, BLOCK_WIF_PRIVATE_KEY_SIZE};
 
 pub struct Wallet {
     private_key: elliptic_curve::SecretKey<Secp256k1>,
     public_key: elliptic_curve::PublicKey<Secp256k1>,
-    address: [u8; ADDRESS_SIZE],
+    address: [u8; BLOCK_ADDRESS_SIZE],
     signing_key: k256::ecdsa::SigningKey,
     verifying_key: k256::ecdsa::VerifyingKey,
-    wif_private_key: Vec<u8>,
+    wif_private_key: [u8; BLOCK_WIF_PRIVATE_KEY_SIZE],
     nonce: u64,
 }
 
@@ -20,10 +20,10 @@ impl Wallet {
     pub fn new() -> Self {
         let private_key: elliptic_curve::SecretKey<Secp256k1> = SecretKey::random(&mut OsRng);
         let public_key: elliptic_curve::PublicKey<Secp256k1> = private_key.public_key();
-        let address: [u8; ADDRESS_SIZE] = Wallet::generate_address(&public_key);
+        let address: [u8; BLOCK_ADDRESS_SIZE] = Wallet::generate_address(&public_key);
         let signing_key: SigningKey = SigningKey::from(&private_key);
         let verifying_key: VerifyingKey = VerifyingKey::from(&public_key);
-        let wif_private_key: Vec<u8> = Wallet::generate_wif_private_key(&private_key, true);
+        let wif_private_key: [u8; BLOCK_WIF_PRIVATE_KEY_SIZE] = Wallet::generate_wif_private_key(&private_key, true);
         let nonce: u64 = 0;
         
         Self {
@@ -45,12 +45,12 @@ impl Wallet {
         self.public_key.clone()
     }
 
-    pub fn get_address(&mut self) -> [u8; ADDRESS_SIZE] {
+    pub fn get_address(&mut self) -> [u8; BLOCK_ADDRESS_SIZE] {
         self.address
     }
 
-    pub fn get_wif_private_key(&mut self) -> Vec<u8> {
-        self.wif_private_key.clone()
+    pub fn get_wif_private_key(&mut self) ->[u8; BLOCK_WIF_PRIVATE_KEY_SIZE] {
+        self.wif_private_key
     }
 
     pub fn get_nonce(&mut self) -> u64 {
@@ -61,7 +61,7 @@ impl Wallet {
         self.nonce = n
     }
 
-    pub fn create_tx(&mut self, amount: u64, fee: u64, recipient: [u8; ADDRESS_SIZE]) -> Transaction{
+    pub fn create_tx(&mut self, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE]) -> Transaction{
         // get the signature for the transaction
         let tx_sig = self.create_tx_sig(*TRANSACTION_VERSION, amount, fee, recipient, self.nonce);
 
@@ -74,7 +74,7 @@ impl Wallet {
         tx
     }
 
-    fn create_tx_sig(&mut self, version: u8, amount: u64, fee: u64, recipient: [u8; ADDRESS_SIZE], nonce: u64) -> Signature {
+    fn create_tx_sig(&mut self, version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Signature {
         // serialize the transaction metadata
         let serialized_tx_metadata = Self::serialize_tx_metadata(version, amount, fee, recipient, nonce);
 
@@ -86,7 +86,7 @@ impl Wallet {
         self.sign(&hashed_serialized_tx_metadata)
     }
 
-    fn serialize_tx_metadata(version: u8, amount: u64, fee: u64, recipient: [u8; ADDRESS_SIZE], nonce: u64) -> Vec<u8> {
+    fn serialize_tx_metadata(version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Vec<u8> {
         // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
         let tx_metadata = TxMetadata::new(version, amount, fee, recipient, nonce);        
         bincode::serialize(&tx_metadata).unwrap()
@@ -113,7 +113,7 @@ impl Wallet {
     // aka who constructs a Transaction? Wallet (cuz it needs to sign it), or Transaction. Maybe something closer to main can constuct the Transaction with Transaction::new(), but then Network uses the wallet to sign it before it is broadcasted?
     // Idk probably want Wallet and Network separated as much as possible
 
-    fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>) -> [u8; ADDRESS_SIZE] {
+    fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>) -> [u8; BLOCK_ADDRESS_SIZE] {
         // block addresses are generated in a similar way to version 1 bitcoin addresses
         // the general process can be found here: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
 
@@ -131,11 +131,11 @@ impl Wallet {
         // version bytes + ripemd160(sha256(compressed public key))
         let mut vec_of_ripe_sha_pub_key = ripemd_sha256_pub_key.to_vec();
         // push the version bytes to the end
-        ADDRESS_VERSION1_BYTES.iter().for_each(|item| {
+        BLOCK_ADDRESS_VERSION1_BYTES.iter().for_each(|item| {
             vec_of_ripe_sha_pub_key.push(*item);
         });
         // then rotate the vector so the version bytes are at the front
-        vec_of_ripe_sha_pub_key.rotate_right(ADDRESS_VERSION1_BYTES.len());
+        vec_of_ripe_sha_pub_key.rotate_right(BLOCK_ADDRESS_VERSION1_BYTES.len());
 
         // sha256(sha256(version bytes + ripemd160(sha256(compressed public key)))) to get checksum 
         let mut sha256_hasher: Sha256 = Sha256::new();
@@ -155,12 +155,12 @@ impl Wallet {
 
         // base58 encode version bytes + ripemd160(sha256(compressed public key)) + first 4 bytes of 
         let address: Vec<u8> = bs58::encode(vec_of_ripe_sha_pub_key).into_vec();
-        // convert vector into [u8; ADDRESS_SIZE]
+        // convert vector into [u8; BLOCK_ADDRESS_SIZE]
         // ToDo: Add graceful error handling here, rather than panic (although an error shouldn't happen here)
-        address.clone().try_into().unwrap_or_else(|address: Vec<u8>| panic!("Expected a Vec of length {} but it was {}", ADDRESS_SIZE, address.len()))
+        address.clone().try_into().unwrap_or_else(|address: Vec<u8>| panic!("Expected a Vec of length {} but it was {}", BLOCK_ADDRESS_SIZE, address.len()))
     }
 
-    fn generate_wif_private_key(private_key: &elliptic_curve::SecretKey<Secp256k1>, compressed: bool) -> Vec<u8> {
+    fn generate_wif_private_key(private_key: &elliptic_curve::SecretKey<Secp256k1>, compressed: bool) -> [u8; BLOCK_WIF_PRIVATE_KEY_SIZE] {
         // private keys are encoded in WIF format similar to bitcoin's WIF format
         // the general process can be found here: https://en.bitcoin.it/wiki/Wallet_import_format#Private_key_to_WIF
 
@@ -197,6 +197,11 @@ impl Wallet {
         private_key_vec.push(second_sha256[3]);
 
         // base58 encode version bytes + ripemd160(sha256(compressed public key)) + first 4 bytes of checksum
-        bs58::encode(private_key_vec).into_vec()
+        let wif_private_key: Vec<u8> = bs58::encode(private_key_vec).into_vec();
+
+        // convert vector into [u8; BLOCK_WIF_PRIVATE_KEY_SIZE]
+        // ToDo: Add graceful error handling here, rather than panic (although an error shouldn't happen here)
+        wif_private_key.clone().try_into().unwrap_or_else(|wif_private_key: Vec<u8>| panic!("Expected a Vec of length {} but it was {}", BLOCK_WIF_PRIVATE_KEY_SIZE, wif_private_key.len()))
+        
     }
 }
