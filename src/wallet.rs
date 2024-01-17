@@ -1,10 +1,11 @@
+use elliptic_curve::sec1::ToEncodedPoint;
 use k256::{SecretKey, ecdsa::{SigningKey, VerifyingKey, Signature, signature::Signer}, PublicKey, Secp256k1};
 use rand_core::OsRng;
 use ripemd::Ripemd160;
 use sha2::{Sha256, Digest};
 
+use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, BLOCK_WIF_PRIVATE_KEY_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 use crate::transaction::{Transaction, TxMetadata};
-use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, BLOCK_WIF_PRIVATE_KEY_SIZE};
 
 pub struct Wallet {
     private_key: elliptic_curve::SecretKey<Secp256k1>,
@@ -65,8 +66,13 @@ impl Wallet {
         // get the signature for the transaction
         let tx_sig = self.create_tx_sig(*TRANSACTION_VERSION, amount, fee, recipient, self.nonce);
 
+        // convert vector into [u8; COMPRESSED_PUBLIC_KEY_SIZE]
+        // ToDo: Add graceful error handling here, rather than panic (although an error shouldn't happen here)
+        let sender_pub_key_vec = self.get_public_key().to_sec1_bytes().to_vec();
+        let sender_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = sender_pub_key_vec.try_into().unwrap_or_else(|sender_pub_key_vec: Vec<u8>| panic!("Expected a Vec of length {} but it was {}", COMPRESSED_PUBLIC_KEY_SIZE, sender_pub_key_vec.len()));
+        
         // create the transaction
-        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, recipient, self.get_address(), tx_sig, self.nonce);
+        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, recipient, sender_pub_key, tx_sig, self.nonce);
 
         // increment the wallet nonce after the transaction was created
         self.set_nonce(self.nonce + 1);

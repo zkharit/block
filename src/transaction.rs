@@ -2,7 +2,7 @@ use k256::ecdsa::Signature;
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
 
-use crate::constants::BLOCK_ADDRESS_SIZE;
+use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transaction {
@@ -17,7 +17,7 @@ pub struct Transaction {
     recipient: [u8; BLOCK_ADDRESS_SIZE],
     // sender compressed public key 0x02 or 0x03 (if y is even/odd respesctively) + x point
     #[serde(with = "serde_big_array::BigArray")]
-    sender: [u8; BLOCK_ADDRESS_SIZE],
+    sender: [u8; COMPRESSED_PUBLIC_KEY_SIZE],
     // sign(sha256(version + amount + fee + recipient + nonce))
     signature: Signature,
     // account nonce, incremented once for each confirmed transaction
@@ -27,7 +27,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], sender: [u8; BLOCK_ADDRESS_SIZE], signature: Signature, nonce: u64) -> Self {
+    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], sender: [u8; COMPRESSED_PUBLIC_KEY_SIZE], signature: Signature, nonce: u64) -> Self {
         Self {
             version,
             amount,
@@ -74,7 +74,7 @@ pub struct TxMetadata {
 }
 
 impl TxMetadata {
-    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; 39], nonce: u64) -> Self {
+    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Self {
         Self {
             version,
             amount,

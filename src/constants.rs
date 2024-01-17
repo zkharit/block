@@ -14,3 +14,5 @@ pub const TRANSACTION_VERSION: &'static u8 = &0x01;
 pub const BLOCK_ADDRESS_SIZE: usize = 39;
 // block version 1 wif private key size in bytes
 pub const BLOCK_WIF_PRIVATE_KEY_SIZE: usize = 52;
+// compressed public key size (32 bytes + 1 byte for x/y even/odd +/-)
+pub const COMPRESSED_PUBLIC_KEY_SIZE: usize = 33;

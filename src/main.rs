@@ -39,6 +39,11 @@ fn main() {
     println!("{:X?}", tx);
     println!("");
 
+    let sender_pub_key = sending_wallet.get_public_key().to_sec1_bytes();
+    println!("Sender Public Key:");
+    println!("{:X?}", sender_pub_key);
+    println!("");
+
     let serialized_tx = tx.serialize_tx();
     println!("Serialized Transaction:");
     println!("{:X?}", serialized_tx);
