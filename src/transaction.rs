@@ -39,9 +39,23 @@ impl Transaction {
         }
     }
 
+    pub fn serialize_hash_tx(& self) -> Vec<u8> {
+        // serialize transaction
+        let serialized_tx = self.serialize_tx();
+        // sha256(serialized transaction)
+        Self::hash_serialized_tx(serialized_tx)
+    }
+
     pub fn serialize_tx(& self) -> Vec<u8> {
         // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
         bincode::serialize(self).unwrap()
+    }
+
+    fn hash_serialized_tx(serialized_tx: Vec<u8>) -> Vec<u8> {
+        // sha256(serialized transaction metadata)
+        let mut sha256_hasher: Sha256 = Sha256::new();
+        sha256_hasher.update(serialized_tx);
+        sha256_hasher.finalize().to_vec()
     }
 }
 
@@ -66,17 +80,19 @@ impl TxMetadata {
         }
     }
 
+    pub fn serialize_hash_tx_metadata(& self) -> Vec<u8> {
+        // serialize transaction metadata
+        let serialized_tx_metadata = self.serialize_tx_metadata();
+        // sha256(serialized transaction metadata)
+        Self::hash_serialized_tx_metadata(serialized_tx_metadata)
+    }
+
     pub fn serialize_tx_metadata(& self) -> Vec<u8> {
         // ToDo: serialized in little endian order, maybe should change to big endian with bincode::Config/bincode::Options/bincode::DefaultOptions
         bincode::serialize(self).unwrap()
     }
 
-    pub fn serialize_hash_tx_metadata(& self) -> Vec<u8> {
-        let serialized_tx_metadata = self.serialize_tx_metadata();
-        self.hash_tx_metadata(serialized_tx_metadata)
-    }
-
-    pub fn hash_tx_metadata(& self, serialized_tx_metadata: Vec<u8>) -> Vec<u8> {
+    fn hash_serialized_tx_metadata(serialized_tx_metadata: Vec<u8>) -> Vec<u8> {
         // sha256(serialized transaction metadata)
         let mut sha256_hasher: Sha256 = Sha256::new();
         sha256_hasher.update(serialized_tx_metadata);

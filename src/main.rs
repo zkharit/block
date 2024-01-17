@@ -27,19 +27,23 @@ fn main() {
     let mut sending_wallet: Wallet = Wallet::new();
     let mut receiving_wallet: Wallet = Wallet::new();
 
-    println!("Sending Wallet: ");
+    println!("Sending Wallet:");
     println!("{:X?}", sending_wallet.get_address());
     println!("");
-    println!("Receiving Wallet: ");
+    println!("Receiving Wallet:");
     println!("{:X?}", receiving_wallet.get_address());
     println!("");
 
     let tx: Transaction = sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address());
     
-
+    println!("Transaction:");
     println!("{:X?}", tx);
     println!("");
+    println!("Serialized Transaction:");
     println!("{:X?}", tx.serialize_tx());
+    println!("");
+    println!("Transaction Hash:");
+    println!("{:X?}", tx.serialize_hash_tx());
 
     // read config file
     // generate new wallet/restore wallet
