@@ -1,6 +1,10 @@
 mod wallet;
+mod transaction;
+mod constants;
 
 use wallet::Wallet;
+use transaction::Transaction;
+
 fn main() {
     // Test Vectors:
     // Test secret key found on: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
@@ -20,8 +24,20 @@ fn main() {
     
     // let secret_key = SecretKey::from_bytes(secret_key_material.into()).unwrap();
 
-    let mut block_wallet: Wallet = Wallet::new();
+    let mut sending_wallet: Wallet = Wallet::new();
+    let mut receiving_wallet: Wallet = Wallet::new();
 
-    println!("{:X?}", block_wallet.address());
-    println!("{:X?}", block_wallet.wif_private_key());
+    println!("{:X?}", receiving_wallet.get_address());
+
+    let tx = sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address());
+
+    println!("{:X?}", tx);
+
+    // read config file
+    // generate new wallet/restore wallet
+        // save to wallet file/read from wallet file
+    // connect to peers
+    // sync blockchain
+        // validate transactions
+        // validate blocks
 }

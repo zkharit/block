@@ -1,4 +1,7 @@
 use k256::ecdsa::Signature;
+use serde::{Serialize, Deserialize};
+
+use crate::constants::ADDRESS_SIZE;
 
 #[derive(Debug)]
 pub struct Transaction {
@@ -9,9 +12,9 @@ pub struct Transaction {
     // fee in smallest denomination - 0.00000001
     fee: u64,
     // recipeint in address format (base58encoded(version bytes + pubkey + checksum))
-    recipient: Vec<u8>,
+    recipient: [u8; ADDRESS_SIZE],
     // sender compressed public key 0x02 or 0x03 (if y is even/odd respesctively) + x point
-    sender: Vec<u8>,
+    sender: [u8; ADDRESS_SIZE],
     // sign(sha256(version + amount + fee + recipient + nonce))
     signature: Signature,
     // account nonce, incremented once for each confirmed transaction
@@ -21,8 +24,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-
-    pub fn new(version: u8, amount: u64, fee: u64, recipient: Vec<u8>, sender: Vec<u8>, signature: Signature, nonce: u64) -> Self{
+    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; ADDRESS_SIZE], sender: [u8; ADDRESS_SIZE], signature: Signature, nonce: u64) -> Self{
         Self {
             version,
             amount,
@@ -31,6 +33,28 @@ impl Transaction {
             sender,
             signature,
             nonce
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TxMetadata {
+    version: u8,
+    amount: u64,
+    fee: u64,
+    #[serde(with = "serde_big_array::BigArray")]
+    recipient: [u8; 39],
+    nonce: u64,
+}
+
+impl TxMetadata {
+    pub fn new(version: u8, amount: u64, fee: u64, recipient: [u8; 39], nonce: u64) -> Self {
+        Self {
+            version,
+            amount,
+            fee,
+            recipient,
+            nonce,
         }
     }
 }
