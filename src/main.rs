@@ -1,9 +1,11 @@
 mod constants;
 mod transaction;
 mod wallet;
+mod verification_engine;
 
 use transaction::Transaction;
 use wallet::Wallet;
+use verification_engine::verify_transaction;
 
 fn main() {
     // Test Vectors:
@@ -57,6 +59,11 @@ fn main() {
     let new_tx = Transaction::from(serialized_tx);
     println!("Rebuilt Transaction: ");
     println!("{:X?}", new_tx);
+    println!("");
+
+    let transaction_verification_result = verify_transaction(new_tx);
+    println!("Transaction Verification:");
+    println!("{:?}", transaction_verification_result);
     println!("");
 
 
