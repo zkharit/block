@@ -1,4 +1,3 @@
-use elliptic_curve::sec1::ToEncodedPoint;
 use k256::{SecretKey, ecdsa::{SigningKey, VerifyingKey, Signature, signature::Signer}, PublicKey, Secp256k1};
 use rand_core::OsRng;
 use ripemd::Ripemd160;
