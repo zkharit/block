@@ -1,4 +1,4 @@
-use k256::ecdsa::{VerifyingKey, signature::Verifier};
+use k256::ecdsa::{VerifyingKey, signature::Verifier, Signature};
 
 use crate::transaction::{Transaction, TxMetadata};
 
@@ -14,5 +14,9 @@ pub fn verify_transaction(t: Transaction) -> Result<(), k256::ecdsa::Error> {
     let verifying_key = VerifyingKey::from_sec1_bytes(&t.sender).unwrap();
 
     // verify the signature and message with the received public key
-    verifying_key.verify(&hashed_serialized_tx_metadata, &t.signature)
+    verify_sig(&verifying_key, &hashed_serialized_tx_metadata, &t.signature)
+}
+
+fn verify_sig(verifying_key: &VerifyingKey, message: &Vec<u8>, signature: &Signature) -> Result<(), k256::ecdsa::Error> {
+    verifying_key.verify(message, signature)
 }
