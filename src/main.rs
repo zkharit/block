@@ -1,11 +1,17 @@
+mod config;
 mod constants;
 mod transaction;
 mod wallet;
 mod verification_engine;
 
+use std::{path::PathBuf, env};
+
+use config::Config;
 use transaction::Transaction;
 use wallet::Wallet;
 use verification_engine::verify_transaction;
+
+use constants::DEFAULT_CONFIG_FILE_NAME;
 
 fn main() {
     // Test Vectors:
@@ -66,6 +72,17 @@ fn main() {
     println!("{:?}", transaction_verification_result);
     println!("");
 
+    let args: Vec<String> = env::args().collect();
+    let config: Config;
+    if args.len() == 2 { 
+        config = Config::new(&PathBuf::from(&args[1]));
+    } else {
+        config = Config::new(&PathBuf::from(DEFAULT_CONFIG_FILE_NAME));
+    }
+
+    println!("Config File Name:");
+    println!("{}", config.get_wallet_file().display());
+    println!("");
 
     // read config file
     // generate new wallet/restore wallet

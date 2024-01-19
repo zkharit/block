@@ -16,3 +16,10 @@ pub const BLOCK_ADDRESS_SIZE: usize = 39;
 pub const BLOCK_WIF_PRIVATE_KEY_SIZE: usize = 52;
 // compressed public key size (32 bytes + 1 byte for x/y even/odd +/-)
 pub const COMPRESSED_PUBLIC_KEY_SIZE: usize = 33;
+// default config file name
+pub const DEFAULT_CONFIG_FILE_NAME: &'static str = "block.conf";
+// default config file contents
+pub const DEFAULT_CONFIG_OPTIONS_STRING: &'static str = r#"
+[wallet]
+wallet_file = "block.wallet"
+"#;
