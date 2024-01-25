@@ -23,4 +23,5 @@ pub const DEFAULT_CONFIG_OPTIONS_STRING: &'static str =
 r#"[wallet]
 wallet_file = "block.wallet"
 compressed_public_key = true
+wallet_file_version = 1
 "#;

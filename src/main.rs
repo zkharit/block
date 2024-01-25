@@ -41,49 +41,58 @@ fn main() {
         config = Config::new(&PathBuf::from(DEFAULT_CONFIG_FILE_NAME));
     }
 
+    // use a different config object but same config as the sending wallet just for testing purposes
+    let config_2 = Config::new(&PathBuf::from(DEFAULT_CONFIG_FILE_NAME));
+
     println!("Wallet File Name (from config):");
     println!("{}", config.get_wallet_config().get_wallet_file().display());
     println!("");
 
     let mut sending_wallet: Wallet = Wallet::new(config.wallet);
-    // let mut receiving_wallet: Wallet = Wallet::new(config.wallet);
+    let receiving_wallet: Wallet = Wallet::new(config_2.wallet);
 
     println!("Sending Wallet:");
     println!("{:X?}", sending_wallet.get_address());
     println!("");
-    // println!("Receiving Wallet:");
-    // println!("{:X?}", receiving_wallet.get_address());
-    // println!("");
+    println!("Receiving Wallet:");
+    println!("{:X?}", receiving_wallet.get_address());
+    println!("");
 
-    // let tx: Transaction = sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address());
-    // println!("Transaction:");
-    // println!("{:X?}", tx);
-    // println!("");
+    let tx: Transaction = match sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+    println!("Transaction:");
+    println!("{:X?}", tx);
+    println!("");
 
-    // let sender_pub_key = sending_wallet.get_public_key().to_sec1_bytes();
-    // println!("Sender Public Key:");
-    // println!("{:X?}", sender_pub_key);
-    // println!("");
+    let sender_pub_key = sending_wallet.get_public_key().to_sec1_bytes();
+    println!("Sender Public Key:");
+    println!("{:X?}", sender_pub_key);
+    println!("");
 
-    // let serialized_tx = tx.serialize_tx();
-    // println!("Serialized Transaction:");
-    // println!("{:X?}", serialized_tx);
-    // println!("");
+    let serialized_tx = tx.serialize_tx();
+    println!("Serialized Transaction:");
+    println!("{:X?}", serialized_tx);
+    println!("");
 
-    // let serialized_hashed_tx = tx.serialize_hash_tx();
-    // println!("Transaction Hash:");
-    // println!("{:X?}", serialized_hashed_tx);
-    // println!("");
+    let serialized_hashed_tx = tx.serialize_hash_tx();
+    println!("Transaction Hash:");
+    println!("{:X?}", serialized_hashed_tx);
+    println!("");
 
-    // let new_tx = Transaction::from(serialized_tx);
-    // println!("Rebuilt Transaction: ");
-    // println!("{:X?}", new_tx);
-    // println!("");
+    let new_tx = Transaction::from(serialized_tx);
+    println!("Rebuilt Transaction: ");
+    println!("{:X?}", new_tx);
+    println!("");
 
-    // let transaction_verification_result = verify_transaction(new_tx);
-    // println!("Transaction Verification:");
-    // println!("{:?}", transaction_verification_result);
-    // println!("");
+    let transaction_verification_result = verify_transaction(new_tx);
+    println!("Transaction Verification:");
+    println!("{:?}", transaction_verification_result);
+    println!("");
 
     // read config file
     // generate new wallet/restore wallet

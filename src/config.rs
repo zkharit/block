@@ -18,6 +18,8 @@ pub struct WalletConfig {
     wallet_file: PathBuf,
     // if the wallet address was derived from a compressed public key
     compressed_public_key: bool,
+    // wallet file version
+    wallet_file_version: u64,
 }
 
 impl Config {
@@ -78,5 +80,9 @@ impl WalletConfig {
 
     pub fn get_compressed_public_key(&self) -> bool {
         self.compressed_public_key
+    }
+
+    pub fn get_wallet_file_version(&self) -> u64 {
+        self.wallet_file_version
     }
 }
