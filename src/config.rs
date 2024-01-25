@@ -7,10 +7,6 @@ use crate::constants::DEFAULT_CONFIG_OPTIONS_STRING;
 
 use crate::util::{create_file_new, open_file_read, read_file_from_beginning};
 
-// ToDo: cehck if the fields of the config should all be public so they can be addressed like: config.wallet.wallet_file, or should there be
-// getter functions for them all? I think getters, because if they are public variables then anything can change them and thats not intended
-// can add setter functions eventually when in console config editing is supported
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub wallet: WalletConfig,
@@ -18,7 +14,10 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WalletConfig {
-    wallet_file: PathBuf
+    // path of the wallet file
+    wallet_file: PathBuf,
+    // if the wallet address was derived from a compressed public key
+    compressed_public_key: bool,
 }
 
 impl Config {
@@ -75,5 +74,9 @@ impl Config {
 impl WalletConfig {
     pub fn get_wallet_file(&self) -> &Path {
         &self.wallet_file
+    }
+
+    pub fn get_compressed_public_key(&self) -> bool {
+        self.compressed_public_key
     }
 }
