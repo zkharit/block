@@ -22,4 +22,5 @@ pub const DEFAULT_CONFIG_FILE_NAME: &'static str = "block.conf";
 pub const DEFAULT_CONFIG_OPTIONS_STRING: &'static str = 
 r#"[wallet]
 wallet_file = "block.wallet"
+compressed_public_key = true
 "#;
