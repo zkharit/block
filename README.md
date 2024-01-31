@@ -2,7 +2,7 @@
 An elementary account based POS blockchain written in Rust
 
 ## description
-block is a POS blockchain utilizing many of the same crypto primitives as Bitcoin, but instead of being UTXO based is account based. Its consensus model chooses a validator proportional to the amount of funds that has been staked to propose a new block every 5 minutes.
+block is a POS blockchain utilizing many of the same crypto primitives as Bitcoin, but instead of being UTXO based it is account based. block's consensus model randomly chooses a validator with chances proportional to the amount of funds that each validator has staked to propose a new block every 5 minutes.
 
 ## documentation
 Full documentation on the block protocol can be found here (coming soon).
