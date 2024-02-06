@@ -1,11 +1,11 @@
 use k256::ecdsa::Signature;
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
-use bincode::Options;
+use bincode::{Options, ErrorKind};
 
 use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Transaction {
     // transaction version
     pub version: u8,
@@ -40,12 +40,12 @@ impl Transaction {
         }
     }
 
-    pub fn from(raw: Vec<u8>) -> Self {
+    pub fn from(raw: Vec<u8>) -> Result<Self, Box<ErrorKind>> {
         bincode::DefaultOptions::new()
             .allow_trailing_bytes()
             .with_fixint_encoding()
             .with_big_endian()
-            .deserialize(&raw).unwrap()
+            .deserialize(&raw)
     }
 
     pub fn serialize_hash_tx(& self) -> Vec<u8> {

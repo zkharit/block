@@ -4,9 +4,11 @@ mod transaction;
 mod wallet;
 mod verification_engine;
 mod util;
+mod block;
 
 use std::{path::PathBuf, env};
 
+use block::Block;
 use config::Config;
 use transaction::Transaction;
 use wallet::Wallet;
@@ -84,7 +86,12 @@ fn main() {
     println!("{:X?}", serialized_hashed_tx);
     println!("");
 
-    let new_tx = Transaction::from(serialized_tx);
+    let new_tx = match Transaction::from(serialized_tx) {
+        Ok(tx) => tx,
+        Err(_) => {
+            panic!("Failed rebuilding serialized transaction");
+        }
+    };
     println!("Rebuilt Transaction: ");
     println!("{:X?}", new_tx);
     println!("");
@@ -92,6 +99,101 @@ fn main() {
     let transaction_verification_result = verify_transaction(new_tx);
     println!("Transaction Verification:");
     println!("{:?}", transaction_verification_result);
+    println!("");
+
+    let tx1: Transaction = match sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    let tx2: Transaction = match sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    let tx3: Transaction = match sending_wallet.create_tx(400000000, 100000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    let tx4: Transaction = match sending_wallet.create_tx(400000000, 200000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    let tx5: Transaction = match sending_wallet.create_tx(500000000, 200000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    let tx6: Transaction = match sending_wallet.create_tx(600000000, 200000000, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
+
+    println!("Tx1 Hash: {:?}", tx1.serialize_hash_tx());
+    println!("Tx2 Hash: {:?}", tx2.serialize_hash_tx());
+    println!("Tx3 Hash: {:?}", tx3.serialize_hash_tx());
+    println!("Tx4 Hash: {:?}", tx4.serialize_hash_tx());
+    println!("Tx5 Hash: {:?}", tx5.serialize_hash_tx());
+    println!("Tx6 Hash: {:?}", tx6.serialize_hash_tx());
+
+    let mut tx_vec = vec![tx1.clone(), tx2.clone(), tx3.clone(), tx4.clone(), tx5.clone(), tx6.clone()];
+    let block1 = Block::new(0x01, [0x00; 32], 0x02, tx_vec);
+
+    let mut tx_vec2 = vec![tx1.clone(), tx2, tx3, tx4, tx5.clone(), tx6.clone(), tx5, tx6];
+    let block2 = Block::new(0x01, [0x00; 32], 0x02, tx_vec2);
+
+    let mut tx_vec3 = vec![tx1.clone()];
+    let block3 = Block::new(0x01, [0x00; 32], 0x02, tx_vec3);
+    
+
+    let serialized_block1 = block1.serialize_block();
+    println!("Serialized Block 1:");
+    println!("{:X?}", serialized_block1);
+    println!("");
+
+    let new_block1 = Block::from(serialized_block1);
+    println!("Rebuilt Block 1: ");
+    println!("{:X?}", new_block1);
+    println!("");
+
+    let serialized_block2 = block2.serialize_block();
+    println!("Serialized Block 2:");
+    println!("{:X?}", serialized_block2);
+    println!("");
+
+    let new_block2 = Block::from(serialized_block2);
+    println!("Rebuilt Block 2: ");
+    println!("{:X?}", new_block2);
+    println!("");
+
+    let serialized_block3 = block3.serialize_block();
+    println!("Serialized Block 3:");
+    println!("{:X?}", serialized_block3);
+    println!("");
+
+    let new_block3 = Block::from(serialized_block3.clone());
+    println!("Rebuilt Block 3: ");
+    println!("{:X?}", new_block3);
     println!("");
 
     // read config file
