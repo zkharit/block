@@ -9,10 +9,11 @@ use crate::util::{create_file_new, open_file_read, read_file_from_beginning};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    pub wallet: WalletConfig,
+    wallet: WalletConfig,
+    validator: ValidatorConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WalletConfig {
     // path of the wallet file
     wallet_file: PathBuf,
@@ -20,6 +21,11 @@ pub struct WalletConfig {
     compressed_public_key: bool,
     // wallet file version
     wallet_file_version: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ValidatorConfig {
+
 }
 
 impl Config {
@@ -67,8 +73,12 @@ impl Config {
         Ok(config_file)
     }
 
-    pub fn get_wallet_config(&self) -> &WalletConfig {
-        &self.wallet
+    pub fn get_wallet_config(&self) -> WalletConfig {
+        self.wallet.clone()
+    }
+
+    pub fn get_validator_config(&self) -> ValidatorConfig {
+        self.validator.clone()
     }
     
 }
@@ -85,4 +95,8 @@ impl WalletConfig {
     pub fn get_wallet_file_version(&self) -> u64 {
         self.wallet_file_version
     }
+}
+
+impl ValidatorConfig {
+
 }

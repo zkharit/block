@@ -24,4 +24,5 @@ r#"[wallet]
 wallet_file = "block.wallet"
 compressed_public_key = true
 wallet_file_version = 1
+[validator]
 "#;

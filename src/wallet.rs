@@ -75,17 +75,11 @@ impl Wallet {
     }
 
     pub fn create_tx(&mut self, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE]) -> Option<Transaction> {
-        // obtain the wallet signing key from the wallet file
-        let signing_key = match self.get_signing_key() {
-            Some(signing_key) => signing_key,
-            None => {
-                println!("Failed to create transaction, could not obtain signing key");
-                return None
-            }
-        };
-
         // get the signature for the transaction
-        let tx_sig = Self::create_tx_sig(signing_key, *TRANSACTION_VERSION, amount, fee, recipient, self.nonce);
+        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, fee, recipient, self.nonce) {
+            Some(tx_sig) => tx_sig,
+            None => return None
+        };
 
         // convert vector into [u8; COMPRESSED_PUBLIC_KEY_SIZE]
         let sender_pub_key_vec = self.get_public_key().to_sec1_bytes().to_vec();
@@ -100,11 +94,37 @@ impl Wallet {
         Some(tx)
     }
 
-    fn create_tx_sig(signing_key: SigningKey, version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Signature {
+    pub fn create_coinbase_tx(&mut self, amount: u64, recipient: [u8; BLOCK_ADDRESS_SIZE]) -> Option<Transaction> {
+        // get the signature for the coinbase transaction
+        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, 0, recipient, 0) {
+            Some(tx_sig) => tx_sig,
+            None => return None
+        };
+
+        // set the sender to a public key of all zeros
+        let sender_pub_key = [0; COMPRESSED_PUBLIC_KEY_SIZE];
+
+        // create the transaction
+        let tx = Transaction::new(*TRANSACTION_VERSION, amount, 0, recipient, sender_pub_key, tx_sig, 0);
+
+        Some(tx)
+
+    }
+
+    fn create_tx_sig(&self, version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Option<Signature> {
+        // obtain the wallet signing key from the wallet file
+        let signing_key = match self.get_signing_key() {
+            Some(signing_key) => signing_key,
+            None => {
+                println!("Failed to create transaction, could not obtain signing key");
+                return None
+            }
+        };
+
         // serialize the transaction metadata
         let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(version, amount, fee, recipient, nonce));
 
-        Self::sign(signing_key, &hashed_serialized_tx_metadata)
+        Some(Self::sign(signing_key, &hashed_serialized_tx_metadata))
     }
 
     fn sign(signing_key: SigningKey, message: &[u8]) -> Signature {

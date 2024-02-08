@@ -64,7 +64,7 @@ impl Transaction {
     }
 
     fn hash_serialized_tx(serialized_tx: Vec<u8>) -> Vec<u8> {
-        // sha256(serialized transaction metadata)
+        // sha256(serialized transaction)
         let mut sha256_hasher: Sha256 = Sha256::new();
         sha256_hasher.update(serialized_tx);
         sha256_hasher.finalize().to_vec()

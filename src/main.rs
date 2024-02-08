@@ -1,10 +1,11 @@
+mod block;
 mod config;
 mod constants;
 mod transaction;
 mod wallet;
+mod validator;
 mod verification_engine;
 mod util;
-mod block;
 
 use std::{path::PathBuf, env};
 
@@ -12,6 +13,7 @@ use block::Block;
 use config::Config;
 use transaction::Transaction;
 use wallet::Wallet;
+use validator::Validator;
 use verification_engine::verify_transaction;
 
 use constants::DEFAULT_CONFIG_FILE_NAME;
@@ -50,8 +52,8 @@ fn main() {
     println!("{}", config.get_wallet_config().get_wallet_file().display());
     println!("");
 
-    let mut sending_wallet: Wallet = Wallet::new(config.wallet);
-    let receiving_wallet: Wallet = Wallet::new(config_2.wallet);
+    let mut sending_wallet: Wallet = Wallet::new(config.get_wallet_config());
+    let receiving_wallet: Wallet = Wallet::new(config_2.get_wallet_config());
 
     println!("Sending Wallet:");
     println!("{:X?}", sending_wallet.get_address());
@@ -156,13 +158,13 @@ fn main() {
     println!("Tx5 Hash: {:?}", tx5.serialize_hash_tx());
     println!("Tx6 Hash: {:?}", tx6.serialize_hash_tx());
 
-    let mut tx_vec = vec![tx1.clone(), tx2.clone(), tx3.clone(), tx4.clone(), tx5.clone(), tx6.clone()];
+    let tx_vec = vec![tx1.clone(), tx2.clone(), tx3.clone(), tx4.clone(), tx5.clone(), tx6.clone()];
     let block1 = Block::new(0x01, [0x00; 32], 0x02, tx_vec);
 
-    let mut tx_vec2 = vec![tx1.clone(), tx2, tx3, tx4, tx5.clone(), tx6.clone(), tx5, tx6];
+    let tx_vec2 = vec![tx1.clone(), tx2, tx3, tx4, tx5.clone(), tx6.clone(), tx5, tx6];
     let block2 = Block::new(0x01, [0x00; 32], 0x02, tx_vec2);
 
-    let mut tx_vec3 = vec![tx1.clone()];
+    let tx_vec3 = vec![tx1.clone()];
     let block3 = Block::new(0x01, [0x00; 32], 0x02, tx_vec3);
     
 
@@ -194,6 +196,16 @@ fn main() {
     let new_block3 = Block::from(serialized_block3.clone());
     println!("Rebuilt Block 3: ");
     println!("{:X?}", new_block3);
+    println!("");
+
+    let mut validator = Validator::new(config.get_validator_config(), sending_wallet);
+    let coinbase_tx = validator.create_coinbase_tx().unwrap();
+    println!("Coinbase TX: ");
+    println!("{:X?}", coinbase_tx);
+    println!("");
+
+    println!("Serialized Coinbase TX: ");
+    print!("{:X?}", coinbase_tx.serialize_tx());
     println!("");
 
     // read config file
