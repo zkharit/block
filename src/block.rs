@@ -160,4 +160,34 @@ impl BlockHeader {
         
         merkle_tree.leaves[0].hash.clone()
     }
+
+    pub fn serialize_block_header(& self) -> Vec<u8> {
+        bincode::DefaultOptions::new()
+            .allow_trailing_bytes()
+            .with_fixint_encoding()
+            .with_big_endian()
+            .serialize(self).unwrap()
+    }
+
+    pub fn serialize_hash_block_header(& self) -> Vec<u8> {
+        // serialize block header
+        let serialized_block_header = self.serialize_block_header();
+        // sha256(serialized block header)
+        Self::hash_serialized_block_header(serialized_block_header)
+    }
+
+    pub fn from(raw: Vec<u8>) -> Result<Self, Box<ErrorKind>> {
+        bincode::DefaultOptions::new()
+            .allow_trailing_bytes()
+            .with_fixint_encoding()
+            .with_big_endian()
+            .deserialize(&raw)
+    }
+
+    fn hash_serialized_block_header(serialized_block_header: Vec<u8>) -> Vec<u8> {
+        // sha256(serialized block header)
+        let mut sha256_hasher: Sha256 = Sha256::new();
+        sha256_hasher.update(serialized_block_header);
+        sha256_hasher.finalize().to_vec()
+    }
 }
