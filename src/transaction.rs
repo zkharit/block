@@ -5,7 +5,7 @@ use bincode::{Options, ErrorKind};
 
 use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Transaction {
     // transaction version
     pub version: u8,
@@ -23,8 +23,6 @@ pub struct Transaction {
     pub signature: Signature,
     // account nonce, incremented once for each confirmed transaction
     pub nonce: u64,
-    // sha256(version + amount + fee + recipient + nonce)
-    // hash: Vec<u8> Not sure if this field is necessary (might just be needed to be included in the blockchain)
 }
 
 impl Transaction {

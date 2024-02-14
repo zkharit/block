@@ -14,7 +14,7 @@ use crate::transaction::Transaction;
 // ToDo: Block or BlockHeader will need a validators hash field, or something similar, to verify the list of validators who have "offered their validating services"
 // Idea is concatenate list of all validators and hash that. That hash (maybe along with a timestamp or maybe not cuz thatll give an attacker the ability to try different combos to win the next block themselves)
 // is used as a seed in a random number generator that will pick the validator of the next block
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Block {
     block_size: u32,
     block_header: BlockHeader,
@@ -22,7 +22,7 @@ pub struct Block {
     transactions: Vec<Transaction>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockHeader {
     version: u32,
     prev_hash: [u8; 32],
@@ -68,7 +68,7 @@ impl Block {
 
     }
 
-    pub fn serialize_block(& self) -> Vec<u8> {
+    pub fn serialize_block(&self) -> Vec<u8> {
         bincode::DefaultOptions::new()
             .allow_trailing_bytes()
             .with_fixint_encoding()
@@ -82,6 +82,10 @@ impl Block {
             .with_fixint_encoding()
             .with_big_endian()
             .deserialize(&raw)
+    }
+
+    pub fn get_transactions(&self) -> &Vec<Transaction> {
+        &self.transactions
     }
 }
 

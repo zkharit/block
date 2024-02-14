@@ -7,10 +7,12 @@ use sha2::{Sha256, Digest};
 use std::{ fs::File, io::{self, Write}, path::Path};
 
 use crate::config::WalletConfig;
-use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 use crate::transaction::{Transaction, TxMetadata};
 use crate::util::{open_file_read, create_file_new, read_file_from_beginning, open_file_write};
 
+use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, COINBASE_SENDER, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_SENDER};
+
+#[derive(Clone)]
 pub struct Wallet {
     public_key: elliptic_curve::PublicKey<Secp256k1>,
     address: [u8; BLOCK_ADDRESS_SIZE],
@@ -102,13 +104,49 @@ impl Wallet {
         };
 
         // set the sender to a public key of all zeros
-        let sender_pub_key = [0; COMPRESSED_PUBLIC_KEY_SIZE];
+        let sender_pub_key = *COINBASE_SENDER;
 
         // create the transaction
         let tx = Transaction::new(*TRANSACTION_VERSION, amount, 0, recipient, sender_pub_key, tx_sig, 0);
 
-        Some(tx)
+        // coinbase transactions do not use nor increment the wallet nonce
 
+        Some(tx)
+    }
+
+    pub fn create_validator_enable_tx(&mut self, amount: u64, fee: u64) -> Option<Transaction> {
+        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, fee, *VALIDATOR_ENABLE_RECIPIENT, self.nonce) {
+            Some(tx_sig) => tx_sig,
+            None => return None
+        };
+
+        // convert vector into [u8; COMPRESSED_PUBLIC_KEY_SIZE]
+        let sender_pub_key_vec = self.get_public_key().to_sec1_bytes().to_vec();
+        let sender_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = sender_pub_key_vec.try_into().unwrap();
+
+        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, *VALIDATOR_ENABLE_RECIPIENT, sender_pub_key, tx_sig, self.nonce);
+        
+        // increment the wallet nonce after the transaction is created
+        self.set_nonce(self.nonce + 1);
+
+        Some(tx)
+    }
+
+    pub fn create_validator_revoke_tx(&mut self, amount: u64, fee: u64) -> Option<Transaction> {
+        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, fee, self.address, self.nonce) {
+            Some(tx_sig) => tx_sig,
+            None => return None
+        };
+
+        // get standard VALIDATOR_REVOKE_SENDER
+        let sender_pub_key = *VALIDATOR_REVOKE_SENDER;
+
+        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, self.address, sender_pub_key, tx_sig, self.nonce);
+
+        // increment the wallet nonce after the transaction is created
+        self.set_nonce(self.nonce + 1);
+
+        Some(tx)
     }
 
     fn create_tx_sig(&self, version: u8, amount: u64, fee: u64, recipient: [u8; BLOCK_ADDRESS_SIZE], nonce: u64) -> Option<Signature> {
@@ -131,7 +169,7 @@ impl Wallet {
         signing_key.sign(message)
     }
 
-    fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>, compressed: bool) -> [u8; BLOCK_ADDRESS_SIZE] {
+    pub fn generate_address(public_key: &elliptic_curve::PublicKey<Secp256k1>, compressed: bool) -> [u8; BLOCK_ADDRESS_SIZE] {
         // block addresses are generated in a similar way to version 1 bitcoin addresses
         // the general process can be found here: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
 
@@ -217,7 +255,6 @@ impl Wallet {
         let wif_private_key: Vec<u8> = bs58::encode(private_key_vec).into_vec();
 
         wif_private_key
-        
     }
 
     fn wif_to_private_key(wif_private_key_string: &str, compressed: bool) -> Option<elliptic_curve::SecretKey<Secp256k1>> {

@@ -1,5 +1,6 @@
 use crate::config::ValidatorConfig;
 use crate::transaction::Transaction;
+use crate::verification_engine;
 use crate::wallet::Wallet;
 
 pub struct Validator {
@@ -10,18 +11,16 @@ pub struct Validator {
 }
 
 impl Validator {
-    pub fn new(config: ValidatorConfig, wallet: Wallet) -> Self {
+    // ToDo: need to look into not cloneing the wallet here, this could result in inconsistent nonce's
+    pub fn new(config: ValidatorConfig, wallet: &Wallet) -> Self {
         Self {
             config,
-            wallet,
+            wallet: wallet.clone(),
         }
     }
 
-    pub fn create_coinbase_tx(&mut self) -> Option<Transaction>{
-        // ToDo: Since validator blocks will be proven to be propsed by the validator by signing the block header, there is nothing stopping a malicious node from changing the included coinbase transaction to whatever (send to WHOever) they want
-        // Actually unsure about this, because they merkle root within the block header will be calculated with the coinbase transaction, and the coinbase transaction contains the recipient selected by the validator
-        // So this may be ok, Need to think about this tomorrow, but Im pretty sure current "unauthenticated" coinbase tx is fine
-        let coinbase_tx = match self.wallet.create_coinbase_tx(50, self.wallet.get_address()) {
+    pub fn create_coinbase_tx(&mut self, block_height: u64) -> Option<Transaction> {
+        let coinbase_tx = match self.wallet.create_coinbase_tx(verification_engine::get_block_subsidy(block_height), self.wallet.get_address()) {
             Some(coinbase_tx) => coinbase_tx,
             None => {
                 println!("Failed to create coinbase tx");
@@ -30,6 +29,11 @@ impl Validator {
         };
 
         Some(coinbase_tx)
+    }
+
+    pub fn create_block(&mut self, transactions: Vec<Transaction>, prev_hash: [u8; 32], block_height: u64) {
+        // ToDo:
+        let coinbase_tx = self.create_coinbase_tx(block_height);
     }
 }
 

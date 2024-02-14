@@ -1,4 +1,6 @@
+mod account;
 mod block;
+mod blockchain;
 mod config;
 mod constants;
 mod transaction;
@@ -10,13 +12,14 @@ mod util;
 use std::{path::PathBuf, env};
 
 use block::Block;
+use blockchain::Blockchain;
 use config::Config;
 use transaction::Transaction;
 use wallet::Wallet;
 use validator::Validator;
 use verification_engine::verify_transaction;
 
-use constants::DEFAULT_CONFIG_FILE_NAME;
+use constants::{DEFAULT_CONFIG_FILE_NAME, BLOCK_VERSION};
 
 fn main() {
     // Test Vectors:
@@ -174,7 +177,7 @@ fn main() {
     println!("");
 
     let new_block1 = Block::from(serialized_block1);
-    println!("Rebuilt Block 1: ");
+    println!("Rebuilt Block 1:");
     println!("{:X?}", new_block1);
     println!("");
 
@@ -184,7 +187,7 @@ fn main() {
     println!("");
 
     let new_block2 = Block::from(serialized_block2);
-    println!("Rebuilt Block 2: ");
+    println!("Rebuilt Block 2:");
     println!("{:X?}", new_block2);
     println!("");
 
@@ -194,18 +197,56 @@ fn main() {
     println!("");
 
     let new_block3 = Block::from(serialized_block3.clone());
-    println!("Rebuilt Block 3: ");
+    println!("Rebuilt Block 3:");
     println!("{:X?}", new_block3);
     println!("");
 
-    let mut validator = Validator::new(config.get_validator_config(), sending_wallet);
-    let coinbase_tx = validator.create_coinbase_tx().unwrap();
-    println!("Coinbase TX: ");
+    let mut validator = Validator::new(config.get_validator_config(), &sending_wallet);
+    let coinbase_tx = validator.create_coinbase_tx(0).unwrap();
+    println!("Coinbase TX:");
     println!("{:X?}", coinbase_tx);
     println!("");
 
-    println!("Serialized Coinbase TX: ");
-    print!("{:X?}", coinbase_tx.serialize_tx());
+    println!("Serialized Coinbase TX:");
+    println!("{:X?}", coinbase_tx.serialize_tx());
+    println!("");
+
+    println!("Serialized Hashed Coinbase TX:");
+    println!("{:X?}", coinbase_tx.serialize_hash_tx());
+    println!("");
+
+    let gensis_txs = vec![coinbase_tx];
+    let genesis_block = Block::new(*BLOCK_VERSION, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], 123, gensis_txs);
+    println!("Genesis Block:");
+    println!("{:X?}", genesis_block);
+    println!("");
+
+    println!("Serialized Genesis Block:");
+    println!("{:X?}", genesis_block.serialize_block());
+    println!("");
+
+    let mut blockchain = Blockchain::new();
+
+    let validator_enable_tx = sending_wallet.create_validator_enable_tx(50, 500).unwrap();
+
+    let validator_tx_vec = vec![validator_enable_tx];
+    let validator_block = Block::new(*BLOCK_VERSION, [0x00; 32], 0x02, validator_tx_vec);
+
+    blockchain.add_block(&validator_block);
+
+    println!("Blockchain:");
+    println!("{:X?}", blockchain);
+    println!("");
+
+    let validator_revoke_tx = sending_wallet.create_validator_revoke_tx(50, 500).unwrap();
+
+    let validator_tx_vec_2 = vec![validator_revoke_tx];
+    let validator_revoke_block = Block::new(*BLOCK_VERSION, [0x00; 32], 0x02, validator_tx_vec_2);
+
+    blockchain.add_block(&validator_revoke_block);
+
+    println!("Blockchain:");
+    println!("{:X?}", blockchain);
     println!("");
 
     // read config file
