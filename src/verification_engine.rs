@@ -6,7 +6,7 @@ use crate::blockchain::Blockchain;
 use crate::transaction::{Transaction, TxMetadata};
 use crate::wallet::Wallet;
 
-use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_SENDER};
+use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT};
 
 // ToDo: dont know exactly what return type I should use here
 // look into custom error handling Result<(), Err>
@@ -14,10 +14,6 @@ pub fn verify_transaction(t: Transaction) -> Result<(), k256::ecdsa::Error> {
     // ToDo: will need to do balance checking when the blockchain/consensus module is created
     // probably need to hold internal state about balances and such so that multiple transactions can be checked in a row including changing account balances
     // check if the account has enough funds to spend
-
-    // ToDo: this will not work for validator_revoke transactions at the moment, because the sender for those transdactions
-    // is the VALIDATOR_REVOKE_SENDER whose private key did not sign this transaction, the receipient's public key is the signer
-    // How to obtain the public key from the recipient address? <- not possible Need to think about how this type of transaction can be verified
 
     // compute the TxMetadata struct from the given transaction
     let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(t.version, t.amount, t.fee, t.recipient, t.nonce));
@@ -112,8 +108,14 @@ pub fn is_validator_enable(transaction: &Transaction, blockchain: &Blockchain) -
 }
 
 pub fn is_validator_revoke(transaction: &Transaction, blockchain: &Blockchain) -> bool {
+    // get the public key from the transaction
+    let validator_pub_key = match PublicKey::from_sec1_bytes(&transaction.sender) {
+        Ok(validator_pub_key) => validator_pub_key,
+        Err(_) => return false
+    };
+
     // get the account address
-    let validator_address = &transaction.recipient;
+    let validator_address = Wallet::generate_address(&validator_pub_key, true);
 
     // confirm user is already a validator on chain
     let validator_account = match blockchain.get_account(&validator_address) {
@@ -126,8 +128,8 @@ pub fn is_validator_revoke(transaction: &Transaction, blockchain: &Blockchain) -
         None => return false
     };
 
-    // confirm the sender is the standard VALIDATOR_REVOKE_RECIPIENT address
-    if transaction.sender != *VALIDATOR_REVOKE_SENDER {
+    // confirm the recipient is the standard VALIDATOR_REVOKE_RECIPIENT address
+    if transaction.recipient != *VALIDATOR_REVOKE_RECIPIENT {
         return false;
     }
 

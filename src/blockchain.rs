@@ -156,8 +156,19 @@ impl Blockchain {
                     }
                 };
 
+                // get the account public key
+                let account_pub_key = match PublicKey::from_sec1_bytes(&transaction.sender) {
+                    Ok(account_pub_key) => account_pub_key,
+                    // ToDo: think about what to do in error scenarios, need to revert the entire block
+                    // but this should NEVER happen since this block must have been validated by the verification_engine first
+                    Err(_) => continue
+                };
+
+                // get the address for the account public key
+                let account_address = Wallet::generate_address(&account_pub_key, true);
+
                 // increment the nonce, set the account as not a validator, increase their balance by the transaction amount, and set their current stake back to 0
-                match self.accounts.get_mut(&transaction.recipient) {
+                match self.accounts.get_mut(&account_address) {
                     Some(account) => {
                         account.increase_nonce();
                         account.set_stake(0);
@@ -167,9 +178,9 @@ impl Blockchain {
                     },
                     None => {
                         // create a new account for this newly discovered address
-                        self.accounts.insert(transaction.recipient, Account::new(transaction.recipient));
+                        self.accounts.insert(account_address, Account::new(account_address));
 
-                        let account = self.accounts.get_mut(&transaction.recipient).unwrap();
+                        let account = self.accounts.get_mut(&account_address).unwrap();
                         account.increase_nonce();
                         account.set_stake(0);
                         account.decrease_balance(transaction.fee);

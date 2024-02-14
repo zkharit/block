@@ -10,7 +10,7 @@ use crate::config::WalletConfig;
 use crate::transaction::{Transaction, TxMetadata};
 use crate::util::{open_file_read, create_file_new, read_file_from_beginning, open_file_write};
 
-use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, COINBASE_SENDER, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_SENDER};
+use crate::constants::{BLOCK_ADDRESS_VERSION1_BYTES, WIF_VERSION1_PREFIX_BYTES, WIF_VERSION1_COMPRESSED_BYTES, TRANSACTION_VERSION, BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, COINBASE_SENDER, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT};
 
 #[derive(Clone)]
 pub struct Wallet {
@@ -133,15 +133,16 @@ impl Wallet {
     }
 
     pub fn create_validator_revoke_tx(&mut self, amount: u64, fee: u64) -> Option<Transaction> {
-        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, fee, self.address, self.nonce) {
+        let tx_sig = match Self::create_tx_sig(self, *TRANSACTION_VERSION, amount, fee, *VALIDATOR_REVOKE_RECIPIENT, self.nonce) {
             Some(tx_sig) => tx_sig,
             None => return None
         };
 
-        // get standard VALIDATOR_REVOKE_SENDER
-        let sender_pub_key = *VALIDATOR_REVOKE_SENDER;
+        // convert vector into [u8; COMPRESSED_PUBLIC_KEY_SIZE]
+        let sender_pub_key_vec = self.get_public_key().to_sec1_bytes().to_vec();
+        let sender_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = sender_pub_key_vec.try_into().unwrap();
 
-        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, self.address, sender_pub_key, tx_sig, self.nonce);
+        let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, *VALIDATOR_REVOKE_RECIPIENT, sender_pub_key, tx_sig, self.nonce);
 
         // increment the wallet nonce after the transaction is created
         self.set_nonce(self.nonce + 1);
