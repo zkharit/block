@@ -53,3 +53,9 @@ Transactions are confirmed within the network in batches by validators in data s
 
 ### verification_engine
 The verification engine module is responsible for verifying transactions and blocks. The verification engine can verify single transactions or blocks at the time. It also has the ability to take a stream of blocks with some initial starting chain state and determine if all of the blocks and transactions within them are valid. This feature is useful for initial block sync, and later block syncs if a node goes offline for some time.
+
+### accounts
+The accounts module identifies an account as is viewed by the blockchain. An account consists of the account's address, it's balance, it's validator status, it's stake (if it is a validator), and it's nonce. The blockchain module uses this to maintain the current chain state.
+
+### blockchain
+The blockchain module keeps track of the current chain state. The chain state consists of a list of blocks and accounts. The blocks contain a list of all transactions within the blockchain created by the accounts. The state of each account on the blockchain is maintaed by the blockchain module updating each account through processing every transaction within every block. Before the blockchain will add any block to itself, it will pass the block through the verification_engine module to confirm that every transaction within said block is not only valid, but valid with the blockchain's current chain state.
