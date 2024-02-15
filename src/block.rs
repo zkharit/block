@@ -99,6 +99,10 @@ impl Block {
     pub fn serialize_hash_block_header(&self) -> Vec<u8> {
         self.block_header.serialize_hash_block_header()
     }
+
+    pub fn get_timesamp(&self) -> u64 {
+        self.block_header.timestamp
+    }
 }
 
 impl BlockHeader {

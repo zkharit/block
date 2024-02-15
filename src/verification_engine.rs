@@ -136,7 +136,17 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
 
     // ToDo: confirm if the correct validator proposed this block with the block signature
 
-    // ToDo: confirm the timestamp of the proposed block matches the systemtime current timestamp (wtihin some interval)
+    // get the timestamp of the previous block
+    let previous_block_timestamp = blockchain.get_last_block().get_timesamp();
+
+    // get the proposed blocks timestamp
+    let current_block_timestamp = block.get_timesamp();
+
+    // timestamp of incoming block should not be less than 5 min after the previous block
+    // ToDo: need to do real time checking on blocks received in real time to make sure timestamp matches with real time
+    if current_block_timestamp - previous_block_timestamp < 300 {
+        return false
+    }
 
     for transaction in block.get_transactions() {
         // verify each transaction and update the local copy of the blockchain
