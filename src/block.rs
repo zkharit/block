@@ -68,6 +68,14 @@ impl Block {
 
     }
 
+    pub fn prev_hash(&self) -> [u8; 32] {
+        self.block_header.prev_hash
+    }
+
+    pub fn merkle_root(&self) -> [u8; 32] {
+        self.block_header.merkle_root
+    }
+
     pub fn serialize_block(&self) -> Vec<u8> {
         bincode::DefaultOptions::new()
             .allow_trailing_bytes()
@@ -87,12 +95,16 @@ impl Block {
     pub fn get_transactions(&self) -> &Vec<Transaction> {
         &self.transactions
     }
+
+    pub fn serialize_hash_block_header(&self) -> Vec<u8> {
+        self.block_header.serialize_hash_block_header()
+    }
 }
 
 impl BlockHeader {
     // ToDo: This function doesn't ever create a full merkle tree, it creates each level of a merkle tree sequentially and returns just the final merkle root
     // To simplify transaction validation for light nodes (which don't and probably won't ever exist on block) a true merkle tree would be needed so that a merkle path can be used to validate single transactions
-    fn calculate_merkle_root(transactions: Vec<Transaction>) -> Vec<u8> {
+    pub fn calculate_merkle_root(transactions: Vec<Transaction>) -> Vec<u8> {
         let mut merkle_nodes: Vec<MerkleNode> = vec![];
 
         for transaction in transactions {

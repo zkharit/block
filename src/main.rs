@@ -101,10 +101,10 @@ fn main() {
     println!("{:X?}", new_tx);
     println!("");
 
-    let transaction_verification_result = verify_transaction(new_tx);
-    println!("Transaction Verification:");
-    println!("{:?}", transaction_verification_result);
-    println!("");
+    // let transaction_verification_result = verify_transaction(new_tx);
+    // println!("Transaction Verification:");
+    // println!("{:?}", transaction_verification_result);
+    // println!("");
 
     let tx1: Transaction = match sending_wallet.create_tx(200000000, 100000000, receiving_wallet.get_address()) {
         Some(tx) => tx,
@@ -225,14 +225,18 @@ fn main() {
     println!("{:X?}", genesis_block.serialize_block());
     println!("");
 
-    let mut blockchain = Blockchain::new();
+    let blockchain = Blockchain::new();
 
     let validator_enable_tx = sending_wallet.create_validator_enable_tx(50, 500).unwrap();
 
     let validator_tx_vec = vec![validator_enable_tx];
     let validator_block = Block::new(*BLOCK_VERSION, [0x00; 32], 0x02, validator_tx_vec);
 
-    blockchain.add_block(&validator_block);
+    let (result, blockchain) = blockchain.add_block(&validator_block);
+
+    if !result {
+        println!("Blockchain failed to update due to invalid transaction or block");
+    }
 
     println!("Blockchain:");
     println!("{:X?}", blockchain);
@@ -243,7 +247,11 @@ fn main() {
     let validator_tx_vec_2 = vec![validator_revoke_tx];
     let validator_revoke_block = Block::new(*BLOCK_VERSION, [0x00; 32], 0x02, validator_tx_vec_2);
 
-    blockchain.add_block(&validator_revoke_block);
+    let (result, blockchain) = blockchain.add_block(&validator_revoke_block);
+
+    if !result {
+        println!("Blockchain failed to update due to invalid transaction or block");
+    }
 
     println!("Blockchain:");
     println!("{:X?}", blockchain);
