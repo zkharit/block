@@ -6,6 +6,7 @@ use sha2::{Sha256, Digest};
 
 use std::{ fs::File, io::{self, Write}, path::Path};
 
+use crate::block::{Block, BlockHeader};
 use crate::config::WalletConfig;
 use crate::transaction::{Transaction, TxMetadata};
 use crate::util::{open_file_read, create_file_new, read_file_from_beginning, open_file_write};
@@ -160,10 +161,32 @@ impl Wallet {
             }
         };
 
-        // serialize the transaction metadata
+        // serialize and hash the transaction metadata
         let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(version, amount, fee, recipient, nonce));
 
         Some(Self::sign(signing_key, &hashed_serialized_tx_metadata))
+    }
+
+    pub fn create_block_sig(&self, version: u32, prev_hash: [u8; 32], timestamp: u64, transactions: &Vec<Transaction>) -> Option<Signature> {
+        // obtain the wallet signing key from the wallet file
+        let signing_key = match self.get_signing_key() {
+            Some(signing_key) => signing_key,
+            None => {
+                println!("Failed to create block signature, could not obtain signing key");
+                return None
+            }
+        };
+
+        // calculate the merkle root from the list of transactions
+        let merkle_root:[u8; 32] = BlockHeader::calculate_merkle_root(transactions.clone()).try_into().unwrap();
+
+        // create the block header
+        let block_header = BlockHeader::new(version, prev_hash, merkle_root, timestamp);
+
+        // serialize and hash block header
+        let hashed_serialized_block_header = block_header.serialize_hash_block_header();
+
+        Some(Self::sign(signing_key, &hashed_serialized_block_header))
     }
 
     fn sign(signing_key: SigningKey, message: &[u8]) -> Signature {

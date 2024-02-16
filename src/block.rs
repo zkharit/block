@@ -1,6 +1,7 @@
 use std::mem;
 
 use bincode::{Options, ErrorKind};
+use k256::ecdsa::Signature;
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
 
@@ -20,6 +21,7 @@ pub struct Block {
     block_header: BlockHeader,
     //transaction_count: u32,
     transactions: Vec<Transaction>,
+    signature: Signature,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,7 +44,7 @@ struct MerkleNode {
 }
 
 impl Block {
-    pub fn new(version: u32, prev_hash: [u8; 32], timestamp: u64, transactions: Vec<Transaction>) -> Self {
+    pub fn new(version: u32, prev_hash: [u8; 32], timestamp: u64, transactions: &Vec<Transaction>, signature: Signature) -> Self {
         // calculate the merkle root
         let merkle_root:[u8; 32] = BlockHeader::calculate_merkle_root(transactions.clone()).try_into().unwrap();
         // create the block header
@@ -57,13 +59,14 @@ impl Block {
         //let transaction_count: u32 = transactions.len().try_into().unwrap();
 
         // get the size of the block (besides the block_size field itself)
-        let block_size = mem::size_of::<BlockHeader>() /*+ mem::size_of_val(&transaction_count)*/ + (mem::size_of::<Transaction>() * transactions.len());
+        let block_size = mem::size_of::<BlockHeader>() /*+ mem::size_of_val(&transaction_count)*/ + (mem::size_of::<Transaction>() * transactions.len() + mem::size_of::<Signature>());
 
         Block {
             block_size: block_size.try_into().unwrap(),
             block_header,
             //transaction_count,
-            transactions: transactions.clone()
+            transactions: transactions.clone(),
+            signature,
         }
 
     }
@@ -103,9 +106,21 @@ impl Block {
     pub fn get_timesamp(&self) -> u64 {
         self.block_header.timestamp
     }
+
+    pub fn get_signature(&self) -> Signature {
+        self.signature
+    }
 }
 
 impl BlockHeader {
+    pub fn new(version: u32, prev_hash: [u8; 32], merkle_root: [u8; 32], timestamp: u64) -> Self {
+        Self {
+            version,
+            prev_hash,
+            merkle_root,
+            timestamp
+        }
+    }
     // ToDo: This function doesn't ever create a full merkle tree, it creates each level of a merkle tree sequentially and returns just the final merkle root
     // To simplify transaction validation for light nodes (which don't and probably won't ever exist on block) a true merkle tree would be needed so that a merkle path can be used to validate single transactions
     pub fn calculate_merkle_root(transactions: Vec<Transaction>) -> Vec<u8> {
@@ -181,7 +196,7 @@ impl BlockHeader {
         merkle_tree.leaves[0].hash.clone()
     }
 
-    pub fn serialize_block_header(& self) -> Vec<u8> {
+    pub fn serialize_block_header(&self) -> Vec<u8> {
         bincode::DefaultOptions::new()
             .allow_trailing_bytes()
             .with_fixint_encoding()
@@ -189,7 +204,7 @@ impl BlockHeader {
             .serialize(self).unwrap()
     }
 
-    pub fn serialize_hash_block_header(& self) -> Vec<u8> {
+    pub fn serialize_hash_block_header(&self) -> Vec<u8> {
         // serialize block header
         let serialized_block_header = self.serialize_block_header();
         // sha256(serialized block header)

@@ -5,10 +5,11 @@ use k256::PublicKey;
 use crate::account::Account;
 use crate::block::Block;
 use crate::transaction::Transaction;
+use crate::validator_account::ValidatorAccount;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECEVIER, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECEVIER, VALIDATOR_ENABLE_RECIPIENT};
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -17,6 +18,8 @@ pub struct Blockchain {
     blocks: Vec<Block>,
     // hashmap of all accounts on the blockchain
     accounts: HashMap<[u8; BLOCK_ADDRESS_SIZE], Account>,
+    // vector of all validators on the blockchain
+    validators: Vec<ValidatorAccount>,
     // the current blockheight
     block_height: u64
 }
@@ -33,13 +36,17 @@ impl Blockchain {
         // create account set
         let accounts = HashMap::new();
 
+        // create validator set
+        let validators:Vec<ValidatorAccount> = vec![];
+
         let block_height = 0;
 
         // create blockchain object
         let mut blockchain = Blockchain {
             blocks,
             accounts,
-            block_height
+            validators,
+            block_height,
         };
 
         // update blockchain object with genesis block transaction
@@ -121,6 +128,9 @@ impl Blockchain {
                 Err(_) => return false
             };
 
+            // add the account to the list of validators
+            self.validators.push(ValidatorAccount::new(transaction.sender));
+
             // get the address for the account public key
             let account_address = Wallet::generate_address(&account_pub_key, true);
 
@@ -180,6 +190,14 @@ impl Blockchain {
                 // This should NEVER happen since this block must have been validated by the verification_engine first
                 Err(_) => return false
             };
+
+            // remove the account from the list of validators
+            for i in 0..self.validators.len() {
+                if self.validators[i].get_public_key() == transaction.sender {
+                    self.validators.remove(i);
+                    break;
+                }
+            }
 
             // get the address for the account public key
             let account_address = Wallet::generate_address(&account_pub_key, true);
@@ -305,5 +323,14 @@ impl Blockchain {
 
     pub fn increase_block_height(&mut self) {
         self.block_height += 1;
+    }
+
+    pub fn calculate_proposer(&self, validator_list: Vec<ValidatorAccount>, previous_validator_pub_key: Option<[u8; COMPRESSED_PUBLIC_KEY_SIZE]>) -> ([u8; COMPRESSED_PUBLIC_KEY_SIZE], usize) {
+        // ToDo: 
+        ([0x00; COMPRESSED_PUBLIC_KEY_SIZE], 0)
+    }
+
+    pub fn get_validators(&self) -> Vec<ValidatorAccount> {
+        self.validators.clone()
     }
 }

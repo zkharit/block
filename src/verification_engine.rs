@@ -6,7 +6,7 @@ use crate::blockchain::Blockchain;
 use crate::transaction::{Transaction, TxMetadata};
 use crate::wallet::Wallet;
 
-use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT};
+use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT, COMPRESSED_PUBLIC_KEY_SIZE};
 
 pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: &Blockchain) -> bool {
     // compute the TxMetadata struct from the given transaction
@@ -134,18 +134,64 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
         return false
     }
 
-    // ToDo: confirm if the correct validator proposed this block with the block signature
+    // ToDo: need to think about some attacks on the network
+    // Validator tries to propogate a block before the actual validator sends theirs. Need to add time increment (2min?) in between picking new validator (must check in real time when blocks are proposed)
+    // Need to also remove validators that consistently never propose a block, or malicious actors can (during the bootstrapping phase) create an unlimted number of validators that don't propose blocks and halts the network
 
-    // get the timestamp of the previous block
-    let previous_block_timestamp = blockchain.get_last_block().get_timesamp();
+    // confirm the validator that proposed the block is the one that should have proposed it
+    let mut proposer_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE];
+    // the index within the validator vector on the blockchain 
+    let mut proposer_pub_key_index: usize;
 
-    // get the proposed blocks timestamp
-    let current_block_timestamp = block.get_timesamp();
+    // the pub key of the previously attempted validator 
+    let mut previous_validator_pub_key: Option<[u8; COMPRESSED_PUBLIC_KEY_SIZE]> = None;
 
-    // timestamp of incoming block should not be less than 5 min after the previous block
-    // ToDo: need to do real time checking on blocks received in real time to make sure timestamp matches with real time
-    if current_block_timestamp - previous_block_timestamp < 300 {
-        return false
+    // initial validator list that can be chosen from to get the block proposer 
+    let mut validator_list = blockchain.get_validators().clone();
+
+    for i in 0..blockchain.get_validators().len() {
+        // obtain the public key of the validator that was chosen to propose this block and use use the previously chosen validatyor pub key (if there was one) as a "seed" for choosing the next validator 
+        (proposer_pub_key, proposer_pub_key_index) = blockchain.calculate_proposer(validator_list.clone(), previous_validator_pub_key);
+
+        let verifying_key = match VerifyingKey::from_sec1_bytes(&proposer_pub_key) {
+            Ok(verifying_key) => verifying_key,
+            // if an invalid public key is received then try the next validator
+            Err(_) => continue
+        };
+
+        // get the contents of what the block signature should contain
+        let hashed_serialized_block_header = block.serialize_hash_block_header();
+
+        // verify the signature and message with the received public key
+        if verify_sig(&verifying_key, &hashed_serialized_block_header, &block.get_signature()) {
+            // if the signature is valid then make sure the timestamp is correct
+
+            // get the timestamp of the previous block
+            let previous_block_timestamp = blockchain.get_last_block().get_timesamp();
+
+            // get the proposed blocks timestamp
+            let current_block_timestamp = block.get_timesamp();
+
+            // timestamp of incoming block should not be less than 5 min after the previous block + 2 minutes for every new validator that would have been chosen
+            // ToDo: need to do real time checking on blocks received in real time to make sure timestamp matches with real time
+            if current_block_timestamp - previous_block_timestamp < 300 + TryInto::<u64>::try_into(i).unwrap() * 120 {
+                return false
+            }
+
+            // if signature is valid and timestamp match then the proposer is valid
+            break;
+        }
+
+        // if all all validators have been exhausted and the signature doesnt match then this is an invalid block
+        if i == blockchain.get_validators().len() - 1 {
+            return false
+        }
+
+        // set previous_validator_pub_key here
+        previous_validator_pub_key = Some(proposer_pub_key);
+
+        // remove the previous validator from the possible validators list
+        validator_list.remove(proposer_pub_key_index);
     }
 
     for transaction in block.get_transactions() {
