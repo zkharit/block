@@ -233,7 +233,7 @@ fn main() {
     let validator_tx_vec = vec![validator_enable_tx];
     let validator_block = Block::new(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec, sending_wallet.create_block_sig(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec).unwrap());
 
-    let (result, blockchain) = blockchain.add_block(&validator_block);
+    let (result, mut blockchain) = blockchain.add_block(&validator_block);
 
     if !result {
         println!("Blockchain failed to update due to invalid transaction or block");
@@ -244,6 +244,8 @@ fn main() {
     println!("");
 
     let validator_revoke_tx = sending_wallet.create_validator_revoke_tx(50, 500).unwrap();
+
+    blockchain.add_transaction_mempool(&validator_revoke_tx);
 
     let validator_tx_vec_2 = vec![validator_revoke_tx];
     let validator_revoke_block = Block::new(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2, sending_wallet.create_block_sig(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2).unwrap());

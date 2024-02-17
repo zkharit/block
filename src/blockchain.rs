@@ -10,7 +10,7 @@ use crate::validator_account::ValidatorAccount;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECEVIER, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECIPIENT, VALIDATOR_ENABLE_RECIPIENT};
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -21,6 +21,8 @@ pub struct Blockchain {
     accounts: HashMap<[u8; BLOCK_ADDRESS_SIZE], Account>,
     // vector of all validators on the blockchain
     validators: Vec<ValidatorAccount>,
+    // list of unconfirmed transactions
+    mempool: Vec<Transaction>,
     // the current blockheight
     block_height: u64
 }
@@ -40,6 +42,9 @@ impl Blockchain {
         // create validator set
         let validators: Vec<ValidatorAccount> = vec![];
 
+        // create mempool
+        let mempool: Vec<Transaction> = vec![];
+
         let block_height = 0;
 
         // create blockchain object
@@ -47,6 +52,7 @@ impl Blockchain {
             blocks,
             accounts,
             validators,
+            mempool,
             block_height,
         };
 
@@ -80,6 +86,18 @@ impl Blockchain {
         (true, new_blockchain)
     }
 
+    pub fn add_transaction_mempool(&mut self, transaction: &Transaction) -> bool {
+        // verify the received transaction
+        if verification_engine::verify_transaction(transaction, None, self) {
+            // if it is valid add it to the mempool
+            self.mempool.push(transaction.clone());
+        } else {
+            return false
+        }
+
+        true
+    }
+
     fn update_chain(&mut self, block: &Block) -> bool {
         // this function assumes that the blocks given to it are valid with the current chain state
         // this function should only ever be called after the verification engine has verified all transactions within the given block with the current chain state
@@ -98,15 +116,15 @@ impl Blockchain {
         // get the validator address for this block
         let validator_address: [u8; BLOCK_ADDRESS_SIZE] = match block.get_transactions().get(0) {
             Some(transaction) => {
-                if verification_engine::is_coinbase(transaction, block, self.get_block_height()) {
+                if verification_engine::is_coinbase(transaction, Some(block), self.get_block_height()) {
                     transaction.recipient
                 } else {
                     // if there is no coinbase transaction then the validator will lose all rewards for this block
-                    *LOOSE_CHANGE_RECEVIER
+                    *LOOSE_CHANGE_RECIPIENT
                 }
             },
             // if there are no transactions in the block then the validator will lose all rewards for this block
-            None => *LOOSE_CHANGE_RECEVIER
+            None => *LOOSE_CHANGE_RECIPIENT
         };
 
         // transaction is a validator enable transaction
@@ -243,7 +261,7 @@ impl Blockchain {
             };
         } else {
             // transaction is a coinbase transaction
-            if verification_engine::is_coinbase(&transaction, block, self.get_block_height()) {
+            if verification_engine::is_coinbase(&transaction, Some(block), self.get_block_height()) {
                 match self.accounts.get_mut(&transaction.recipient) {
                     // increase the balance by the coinbase amount
                     Some(account) => account.increase_balance(transaction.amount),

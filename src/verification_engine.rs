@@ -8,7 +8,7 @@ use crate::wallet::Wallet;
 
 use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT, COMPRESSED_PUBLIC_KEY_SIZE};
 
-pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: &Blockchain) -> bool {
+pub fn verify_transaction(transaction: &Transaction, block: Option<&Block>, blockchain: &Blockchain) -> bool {
     // compute the TxMetadata struct from the given transaction
     let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(transaction.version, transaction.amount, transaction.fee, transaction.recipient, transaction.nonce));
     let verifying_key = match VerifyingKey::from_sec1_bytes(&transaction.sender) {
@@ -33,7 +33,7 @@ pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: 
     let account_address = Wallet::generate_address(&account_pub_key, true);
 
     // confirm the nonce is correct for this transaction unless it is a coinbase transaction
-    if !is_coinbase(&transaction, &block, blockchain.get_block_height()) {
+    if !is_coinbase(&transaction, block, blockchain.get_block_height()) {
         // obtain the account nonce in the blockchains view
         let tx_account_nonce = match blockchain.get_account(&account_address) {
             Some(tx_account) => {
@@ -80,9 +80,11 @@ pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: 
         if account_balance < transaction.fee {
             return false
         }
-    } else if is_coinbase(&transaction, &block, blockchain.get_block_height()) {
+    } else if is_coinbase(&transaction, block, blockchain.get_block_height()) {
 
     } else {
+        // ToDo: need to make it illegal to send to the special addresses, COINBASE_SEND, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT, LOOSE_CHANGE_RECIPIENT
+
         // obtain the sender balance
         let account_balance = match blockchain.get_account(&account_address) {
             Some(tx_account) => {
@@ -191,7 +193,7 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
 
     for transaction in block.get_transactions() {
         // verify each transaction and update the local copy of the blockchain
-        if verify_transaction(transaction, &block, &new_blockchain) {
+        if verify_transaction(transaction, Some(&block), &new_blockchain) {
             if !new_blockchain.update_chain_transaction(transaction, &block) {
                 return false
             }
@@ -203,14 +205,20 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
     true
 }
 
-pub fn is_coinbase(transaction: &Transaction, block: &Block, block_height: u64) -> bool {
+pub fn is_coinbase(transaction: &Transaction, block: Option<&Block>, block_height: u64) -> bool {
     // the signature of a coinbase transaction only needs to be a valid signature, its contents are never checked
 
-    // make sure the transactions is the first transaction in the block
-    match block.get_transactions().get(0) {
-        Some(tx) => {
-            if *transaction != *tx {
-                return false
+    // if there is no block passed in, then it cannot be a valid coinbase transaction
+    match block {
+        Some(block) => {
+            // make sure the transaction is the first transaction in the block
+            match block.get_transactions().get(0) {
+                Some(tx) => {
+                    if *transaction != *tx {
+                        return false
+                    }
+                },
+                None => return false
             }
         },
         None => return false
