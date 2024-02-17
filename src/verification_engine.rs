@@ -53,9 +53,6 @@ pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: 
     
     // check for proper balances
     if is_validator_enable(&transaction, &blockchain) {
-        // ToDo: what else do I need to check here?
-        // ToDo: confirm the sender is the proper person?
-
         // obtain the sender balance
         let account_balance = match blockchain.get_account(&account_address) {
             Some(tx_account) => {
@@ -70,9 +67,6 @@ pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: 
             return false
         }
     } else if is_validator_revoke(&transaction, &blockchain) {
-        // ToDo: what else do I need to check here?
-        // ToDo: confirm the sender is the proper person?
-
         // obtain the sender balance
         let account_balance = match blockchain.get_account(&account_address) {
             Some(tx_account) => {
@@ -87,8 +81,7 @@ pub fn verify_transaction(transaction: &Transaction, block: &Block, blockchain: 
             return false
         }
     } else if is_coinbase(&transaction, &block, blockchain.get_block_height()) {
-        // ToDo: what else do I need to check here?
-        // ToDo: confirm the sender is the proper person?
+
     } else {
         // obtain the sender balance
         let account_balance = match blockchain.get_account(&account_address) {
@@ -116,8 +109,6 @@ fn verify_sig(verifying_key: &VerifyingKey, message: &Vec<u8>, signature: &Signa
 }
 
 pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
-    // ToDo: need to include a block signature signed by the proposer and validate that signature
-
     // temporary blockchain to maintain state within the block and its transactions
     let mut new_blockchain = blockchain.clone();
 
@@ -151,7 +142,11 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
 
     for i in 0..blockchain.get_validators().len() {
         // obtain the public key of the validator that was chosen to propose this block and use use the previously chosen validatyor pub key (if there was one) as a "seed" for choosing the next validator 
-        (proposer_pub_key, proposer_pub_key_index) = blockchain.calculate_proposer(validator_list.clone(), previous_validator_pub_key);
+        (proposer_pub_key, proposer_pub_key_index) = match blockchain.calculate_proposer(validator_list.clone(), previous_validator_pub_key) {
+            Some((proposer_pub_key, proposer_pub_key_index)) => (proposer_pub_key, proposer_pub_key_index),
+            // should never get here
+            None => continue
+        };
 
         let verifying_key = match VerifyingKey::from_sec1_bytes(&proposer_pub_key) {
             Ok(verifying_key) => verifying_key,

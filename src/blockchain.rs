@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use k256::PublicKey;
+use sha2::{Sha256, Digest};
 
 use crate::account::Account;
 use crate::block::Block;
@@ -9,7 +10,7 @@ use crate::validator_account::ValidatorAccount;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECEVIER, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECEVIER, VALIDATOR_ENABLE_RECIPIENT};
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -37,7 +38,7 @@ impl Blockchain {
         let accounts = HashMap::new();
 
         // create validator set
-        let validators:Vec<ValidatorAccount> = vec![];
+        let validators: Vec<ValidatorAccount> = vec![];
 
         let block_height = 0;
 
@@ -56,6 +57,7 @@ impl Blockchain {
     }
 
     pub fn add_block(self, block: &Block) -> (bool, Blockchain) {
+        // ToDo: can return Option<Blockchain> instead of bool tuple?
         // temporary blockchain to make changes on, will return this blockchain if block and all transactions are valid
         let mut new_blockchain = self.clone();
 
@@ -309,6 +311,99 @@ impl Blockchain {
         true
     }
 
+    pub fn calculate_proposer(&self, validator_list: Vec<ValidatorAccount>, previous_validator_pub_key: Option<[u8; COMPRESSED_PUBLIC_KEY_SIZE]>) -> Option<([u8; COMPRESSED_PUBLIC_KEY_SIZE], usize)> {
+        let mut proposer_hash = match previous_validator_pub_key {
+            Some(previous_validator_pub_key) => {
+                // Note: the previous_validator_pub_key is NOT the previous blocks validator's public key, it is the previous validator that would've been chosen for the CURRENT block
+                // this is used in the scenario where a validator didn't propose a block and they were the chosen validator. The previous_validator_pub_key is used as a "seed" for choosing a new validator
+                
+                // concatenate the previous blocks hash and the previously chosen validator for this block
+                let mut concatenated_prev_hash_previous_validator_pub_key: Vec<u8> = vec![];
+                concatenated_prev_hash_previous_validator_pub_key.append(&mut self.get_last_block().serialize_hash_block_header());
+                concatenated_prev_hash_previous_validator_pub_key.append(&mut previous_validator_pub_key.clone().to_vec());
+
+                // sha256(prev_hash + previous_validator_pub_key)
+                let mut sha256_hasher: Sha256 = Sha256::new();
+                sha256_hasher.update(concatenated_prev_hash_previous_validator_pub_key);
+                sha256_hasher.finalize().to_vec()
+            },
+            // if this is the first validator (there is no previously attetmpted validator) then just use the previous block hash as the "seed"
+            None => self.get_last_block().serialize_hash_block_header()
+        };
+
+        // get the bottom 64 bits of the hash
+        let bottom_64_bits: Vec<u8> = proposer_hash.drain(24..).collect();
+
+        // convert that to a 64 bit integer
+        let bottom_64_as_integer = u64::from_be_bytes(bottom_64_bits.try_into().unwrap());
+
+        // get the total stake the validator_list has staked
+        let mut total_stake = 0;
+
+        for i in 0..validator_list.len() {
+            let validator_pub_key = match PublicKey::from_sec1_bytes(&validator_list[i].get_public_key()) {
+                Ok(validator_pub_key) => validator_pub_key,
+                // should never get here
+                Err(_) => continue
+            };
+
+            // get the address for the account public key
+            let account_address = Wallet::generate_address(&validator_pub_key, true);
+
+            let validator_account = match self.get_account(&account_address) {
+                Some(validator_account) => validator_account,
+                // Should never get here
+                None => continue
+            };
+
+            // accumulate the total stake variable
+            total_stake += validator_account.get_stake();
+        }
+
+        // if the blockchain is out of the bootstrapping phase mod the bottom 64 bits integer with the total amount the validator_list has staked
+        if self.get_block_height() > *BOOTSTRAPPING_PHASE_BLOCK_HEIGHT {
+            let winning_number = bottom_64_as_integer % total_stake;
+
+            // iterate through the validator list (order here matters) and add each stake until youve reached the the winning stake number
+            let mut total_staked_accumulation = 0;
+
+            for i in 0..validator_list.len() {
+                let validator_pub_key = match PublicKey::from_sec1_bytes(&validator_list[i].get_public_key()) {
+                    Ok(validator_pub_key) => validator_pub_key,
+                    // should never get here
+                    Err(_) => continue
+                };
+
+                // get the address for the account public key
+                let account_address = Wallet::generate_address(&validator_pub_key, true);
+
+                // get the validator account
+                let validator_account = match self.get_account(&account_address) {
+                    Some(validator_account) => validator_account,
+                    // Should never get here
+                    None => continue
+                };
+
+                // accumulate the total 
+                total_staked_accumulation += validator_account.get_stake();
+
+                // when the winning number has been reached return the winning validator
+                if total_staked_accumulation >= winning_number {
+                    return Some((validator_list[i].get_public_key(), i))
+                }
+            }
+        } else {
+            // if the blockchain is in the bootstrapping phase mod the bottom 64 bits integer with the total amount of validators
+            // this prevents a scenario where if 1 validator has staked some coins and none of the others have, the one validator that has staked coins will always be the chosen validator
+            // this allows for an attack vector on the network, since you can create unlimited accounts for free (during the bootstrapping phase)
+            let winning_number = bottom_64_as_integer % TryInto::<u64>::try_into(validator_list.len()).unwrap();
+            return Some((validator_list[winning_number as usize].get_public_key(), winning_number as usize))
+        }
+
+        // Should never get here, but in this scenario return none
+        None
+    }
+
     pub fn get_block_height(&self) -> u64 {
         self.block_height
     }
@@ -323,11 +418,6 @@ impl Blockchain {
 
     pub fn increase_block_height(&mut self) {
         self.block_height += 1;
-    }
-
-    pub fn calculate_proposer(&self, validator_list: Vec<ValidatorAccount>, previous_validator_pub_key: Option<[u8; COMPRESSED_PUBLIC_KEY_SIZE]>) -> ([u8; COMPRESSED_PUBLIC_KEY_SIZE], usize) {
-        // ToDo: 
-        ([0x00; COMPRESSED_PUBLIC_KEY_SIZE], 0)
     }
 
     pub fn get_validators(&self) -> Vec<ValidatorAccount> {

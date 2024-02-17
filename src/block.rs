@@ -11,10 +11,6 @@ use crate::transaction::Transaction;
 // This duplicates the transaction count in the serialized structure. Probably should have a customized serialization function, so its not just implicity there
 // but thats extra work thats probably not needed at this time
 
-// ToDo: Block or BlockHeader will need a signature field so nodes can verify the block was proposed by the validator who was chosen to propose it
-// ToDo: Block or BlockHeader will need a validators hash field, or something similar, to verify the list of validators who have "offered their validating services"
-// Idea is concatenate list of all validators and hash that. That hash (maybe along with a timestamp or maybe not cuz thatll give an attacker the ability to try different combos to win the next block themselves)
-// is used as a seed in a random number generator that will pick the validator of the next block
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Block {
     block_size: u32,
