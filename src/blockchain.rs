@@ -21,7 +21,7 @@ pub struct Blockchain {
     accounts: HashMap<[u8; BLOCK_ADDRESS_SIZE], Account>,
     // vector of all validators on the blockchain
     validators: Vec<ValidatorAccount>,
-    // list of unconfirmed transactions
+    // sorted list of unconfirmed transactions by fee
     mempool: Vec<Transaction>,
     // the current blockheight
     block_height: u64
@@ -34,6 +34,7 @@ impl Blockchain {
         let genesis_block = Block::from(GENESIS_BLOCK.to_vec()).unwrap();
 
         // add genesis block to chain
+        // ToDo: gensis block validation?
         blocks.push(genesis_block.clone());
 
         // create account set
@@ -87,10 +88,12 @@ impl Blockchain {
     }
 
     pub fn add_transaction_mempool(&mut self, transaction: &Transaction) -> bool {
+        // ToDo: need to allow multiple transactions from the same sender to be in the mempool (nonce checking issue)
         // verify the received transaction
         if verification_engine::verify_transaction(transaction, None, self) {
             // if it is valid add it to the mempool
             self.mempool.push(transaction.clone());
+            self.mempool.sort();
         } else {
             return false
         }
@@ -440,5 +443,14 @@ impl Blockchain {
 
     pub fn get_validators(&self) -> Vec<ValidatorAccount> {
         self.validators.clone()
+    }
+
+    pub fn get_mempool(&self) -> Vec<Transaction> {
+        self.mempool.clone()
+    }
+
+    pub fn remove_from_mempool(&mut self, transaction_count: u64) {
+        // removes the first "transaction_count" transactions from the mempool 
+        self.mempool = self.mempool.drain(transaction_count as usize..).collect();
     }
 }

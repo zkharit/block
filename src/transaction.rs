@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use k256::ecdsa::Signature;
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
@@ -5,7 +7,7 @@ use bincode::{Options, ErrorKind};
 
 use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Transaction {
     // transaction version
     pub version: u8,
@@ -68,6 +70,27 @@ impl Transaction {
         sha256_hasher.finalize().to_vec()
     }
 }
+
+impl Ord for Transaction {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (other.fee).cmp(&self.fee)
+    }
+}
+
+impl PartialOrd for Transaction {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.fee.cmp(&self.fee))
+    }
+}
+
+impl PartialEq for Transaction {
+    fn eq(&self, other: &Self) -> bool {
+        (self.version, self.amount, self.fee, self.recipient, self.sender, self.signature, self.nonce) == 
+        (other.version, other.amount, other.fee, other.recipient, other.sender, other.signature, other.nonce)
+    }
+}
+
+impl Eq for Transaction {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxMetadata {

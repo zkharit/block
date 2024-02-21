@@ -25,7 +25,8 @@ pub struct WalletConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ValidatorConfig {
-
+    // if a conbase transaction cannot be created should the validator still propose the block
+    propose_without_coinbase: bool
 }
 
 impl Config {
@@ -98,5 +99,7 @@ impl WalletConfig {
 }
 
 impl ValidatorConfig {
-
+    pub fn get_propose_without_coinbase(&self) -> bool {
+        self.propose_without_coinbase
+    }
 }

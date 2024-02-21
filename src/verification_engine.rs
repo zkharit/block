@@ -6,34 +6,33 @@ use crate::blockchain::Blockchain;
 use crate::transaction::{Transaction, TxMetadata};
 use crate::wallet::Wallet;
 
-use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, HALVING_INTERVAL, LOWEST_DENOMINATION_PER_COIN, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT, COMPRESSED_PUBLIC_KEY_SIZE};
+use crate::constants::{BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COINBASE_SENDER, COMPRESSED_PUBLIC_KEY_SIZE, HALVING_INTERVAL, LOOSE_CHANGE_RECIPIENT, LOWEST_DENOMINATION_PER_COIN, MAX_TRANSACTIONS_PER_BLOCK, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT};
 
 pub fn verify_transaction(transaction: &Transaction, block: Option<&Block>, blockchain: &Blockchain) -> bool {
-    // compute the TxMetadata struct from the given transaction
-    let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(transaction.version, transaction.amount, transaction.fee, transaction.recipient, transaction.nonce));
-    let verifying_key = match VerifyingKey::from_sec1_bytes(&transaction.sender) {
-        Ok(verifying_key) => verifying_key,
-        // if an invalid public key is received then the transaction is invalid
-        Err(_) => return false
-    };
+    if !is_coinbase(transaction, block, blockchain.get_block_height()) {
+        // compute the TxMetadata struct from the given transaction
+        let hashed_serialized_tx_metadata = TxMetadata::serialize_hash_tx_metadata(&TxMetadata::new(transaction.version, transaction.amount, transaction.fee, transaction.recipient, transaction.nonce));
+        let verifying_key = match VerifyingKey::from_sec1_bytes(&transaction.sender) {
+            Ok(verifying_key) => verifying_key,
+            // if an invalid public key is received then the transaction is invalid
+            Err(_) => return false
+        };
 
-    // verify the signature and message with the received public key
-    if !verify_sig(&verifying_key, &hashed_serialized_tx_metadata, &transaction.signature) {
-        return false
-    }
+        // verify the signature and message with the received public key
+        if !verify_sig(&verifying_key, &hashed_serialized_tx_metadata, &transaction.signature) {
+            return false
+        }
 
-    // get the account public key
-    let account_pub_key = match PublicKey::from_sec1_bytes(&transaction.sender) {
-        Ok(account_pub_key) => account_pub_key,
-        // if an invalid public key is received then the transaction is invalid
-        Err(_) => return false
-    };
+        // get the account public key
+        let account_pub_key = match PublicKey::from_sec1_bytes(&transaction.sender) {
+            Ok(account_pub_key) => account_pub_key,
+            // if an invalid public key is received then the transaction is invalid
+            Err(_) => return false
+        };
 
-    // get the address for the account public key
-    let account_address = Wallet::generate_address(&account_pub_key, true);
+        // get the address for the account public key
+        let account_address = Wallet::generate_address(&account_pub_key, true);
 
-    // confirm the nonce is correct for this transaction unless it is a coinbase transaction
-    if !is_coinbase(&transaction, block, blockchain.get_block_height()) {
         // obtain the account nonce in the blockchains view
         let tx_account_nonce = match blockchain.get_account(&account_address) {
             Some(tx_account) => {
@@ -49,54 +48,55 @@ pub fn verify_transaction(transaction: &Transaction, block: Option<&Block>, bloc
         if transaction.nonce != tx_account_nonce {
             return false
         }
-    }
-    
-    // check for proper balances
-    if is_validator_enable(&transaction, &blockchain) {
-        // obtain the sender balance
-        let account_balance = match blockchain.get_account(&account_address) {
-            Some(tx_account) => {
-                tx_account.get_balance()
-            },
-            // if the account is not within the blockchain then it has no funds, but it can send a validator enable tx with 0 fees and 0 stake (during the bootstrapping phase)
-            None => 0
-        };
 
-        // confirm the sender's balance is at least the transaction fee
-        if account_balance < (transaction.fee + transaction.amount) {
-            return false
-        }
-    } else if is_validator_revoke(&transaction, &blockchain) {
-        // obtain the sender balance
-        let account_balance = match blockchain.get_account(&account_address) {
-            Some(tx_account) => {
-                tx_account.get_balance()
-            },
-            // if the account is not within the blockchain then it has no funds, but it can send a validator revoke tx with 0 fees, technically should never be able to get here
-            None => 0
-        };
+        // check for proper balances
+        if is_validator_enable(transaction, blockchain) {
+            // obtain the sender balance
+            let account_balance = match blockchain.get_account(&account_address) {
+                Some(tx_account) => {
+                    tx_account.get_balance()
+                },
+                // if the account is not within the blockchain then it has no funds, but it can send a validator enable tx with 0 fees and 0 stake (during the bootstrapping phase)
+                None => 0
+            };
 
-        // confirm the sender's balance is at least the transaction fee
-        if account_balance < transaction.fee {
-            return false
-        }
-    } else if is_coinbase(&transaction, block, blockchain.get_block_height()) {
+            // confirm the sender's balance is at least the transaction fee
+            if account_balance < (transaction.fee + transaction.amount) {
+                return false
+            }
+        } else if is_validator_revoke(transaction, blockchain) {
+            // obtain the sender balance
+            let account_balance = match blockchain.get_account(&account_address) {
+                Some(tx_account) => {
+                    tx_account.get_balance()
+                },
+                // if the account is not within the blockchain then it has no funds, but it can send a validator revoke tx with 0 fees, technically should never be able to get here
+                None => 0
+            };
 
-    } else {
-        // ToDo: need to make it illegal to send to the special addresses, COINBASE_SEND, VALIDATOR_ENABLE_RECIPIENT, VALIDATOR_REVOKE_RECIPIENT, LOOSE_CHANGE_RECIPIENT
+            // confirm the sender's balance is at least the transaction fee
+            if account_balance < transaction.fee {
+                return false
+            }
+        } else {
+            // confirm the sender isn't trying to send to any of the "special" addresses 
+            if transaction.recipient == *VALIDATOR_ENABLE_RECIPIENT || transaction.recipient == *VALIDATOR_REVOKE_RECIPIENT || transaction.recipient == *LOOSE_CHANGE_RECIPIENT {
+                return false
+            }
+            
+            // obtain the sender balance
+            let account_balance = match blockchain.get_account(&account_address) {
+                Some(tx_account) => {
+                    tx_account.get_balance()
+                },
+                // if the account is not within the blockchain then it definitely doesn't have sufficient funds
+                None => return false
+            };
 
-        // obtain the sender balance
-        let account_balance = match blockchain.get_account(&account_address) {
-            Some(tx_account) => {
-                tx_account.get_balance()
-            },
-            // if the account is not within the blockchain then it definitely doesn't have sufficient funds
-            None => return false
-        };
-
-        // confirm the sender's balance is at least the transaction amount and transaction fee
-        if account_balance < (transaction.fee + transaction.amount) {
-            return false
+            // confirm the sender's balance is at least the transaction amount and transaction fee
+            if account_balance < (transaction.fee + transaction.amount) {
+                return false
+            }
         }
     }
 
@@ -116,6 +116,11 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
 
     // confirm the proposed block previous hash matches the blockchains last blocks previous hash
     if new_blockchain.get_last_block().serialize_hash_block_header() != block.prev_hash() {
+        return false
+    }
+
+    // confirm the transaction list doesn't have more than the MAX_TRANSACTIONS_PER_BLOCK
+    if block.get_transactions().len() > *MAX_TRANSACTIONS_PER_BLOCK {
         return false
     }
 

@@ -25,6 +25,7 @@ wallet_file = "block.wallet"
 compressed_public_key = true
 wallet_file_version = 1
 [validator]
+propose_without_coinbase = true
 "#;
 // version bytes used to indicate block version
 pub const BLOCK_VERSION: &'static u32 = &0x01;
@@ -68,3 +69,5 @@ pub const LOWEST_DENOMINATION_PER_COIN: &'static u64 = &100000000;
 pub const BOOTSTRAPPING_PHASE_BLOCK_HEIGHT: &'static u64 = &105000;
 // minimum amount that needs to be staked to become a validator 32 coins, only used after the bootstrapping phase
 pub const MINIMUM_STAKING_AMOUNT: &'static u64 = &3200000000;
+// maximum transactions allowed per block
+pub const MAX_TRANSACTIONS_PER_BLOCK: &'static usize = &3000;

@@ -202,29 +202,28 @@ fn main() {
     // println!("{:X?}", new_block3);
     // println!("");
 
-    let mut validator = Validator::new(config.get_validator_config(), &sending_wallet);
-    let coinbase_tx = validator.create_coinbase_tx(0).unwrap();
-    println!("Coinbase TX:");
-    println!("{:X?}", coinbase_tx);
-    println!("");
+    // let coinbase_tx = validator.create_coinbase_tx(0).unwrap();
+    // println!("Coinbase TX:");
+    // println!("{:X?}", coinbase_tx);
+    // println!("");
 
-    println!("Serialized Coinbase TX:");
-    println!("{:X?}", coinbase_tx.serialize_tx());
-    println!("");
+    // println!("Serialized Coinbase TX:");
+    // println!("{:X?}", coinbase_tx.serialize_tx());
+    // println!("");
 
-    println!("Serialized Hashed Coinbase TX:");
-    println!("{:X?}", coinbase_tx.serialize_hash_tx());
-    println!("");
+    // println!("Serialized Hashed Coinbase TX:");
+    // println!("{:X?}", coinbase_tx.serialize_hash_tx());
+    // println!("");
 
-    let gensis_txs = vec![coinbase_tx];
-    let genesis_block = Block::new(*BLOCK_VERSION, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], 123, &gensis_txs, sending_wallet.create_block_sig(*BLOCK_VERSION, [0x00; 32], 123, &gensis_txs).unwrap());
-    println!("Genesis Block:");
-    println!("{:X?}", genesis_block);
-    println!("");
+    // let gensis_txs = vec![coinbase_tx];
+    // let genesis_block = Block::new(*BLOCK_VERSION, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], 123, &gensis_txs, sending_wallet.create_block_sig(*BLOCK_VERSION, [0x00; 32], 123, &gensis_txs).unwrap());
+    // println!("Genesis Block:");
+    // println!("{:X?}", genesis_block);
+    // println!("");
 
-    println!("Serialized Genesis Block:");
-    println!("{:X?}", genesis_block.serialize_block());
-    println!("");
+    // println!("Serialized Genesis Block:");
+    // println!("{:X?}", genesis_block.serialize_block());
+    // println!("");
 
     let blockchain = Blockchain::new();
 
@@ -243,14 +242,41 @@ fn main() {
     println!("{:X?}", blockchain);
     println!("");
 
-    let validator_revoke_tx = sending_wallet.create_validator_revoke_tx(50, 500).unwrap();
+    let tx1: Transaction = match sending_wallet.create_tx(50, 500, receiving_wallet.get_address()) {
+        Some(tx) => tx,
+        None => {
+            println!("Failed to create transaction");
+            return
+        }
+    };
 
-    blockchain.add_transaction_mempool(&validator_revoke_tx);
+    blockchain.add_transaction_mempool(&tx1);
 
-    let validator_tx_vec_2 = vec![validator_revoke_tx];
-    let validator_revoke_block = Block::new(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2, sending_wallet.create_block_sig(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2).unwrap());
+    // let validator_revoke_tx = sending_wallet.create_validator_revoke_tx(50, 500).unwrap();
 
-    let (result, blockchain) = blockchain.add_block(&validator_revoke_block);
+    // blockchain.add_transaction_mempool(&validator_revoke_tx);
+
+    // let validator_tx_vec_2 = vec![validator_revoke_tx];
+    // let validator_revoke_block = Block::new(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2, sending_wallet.create_block_sig(*BLOCK_VERSION, blockchain.get_last_block().serialize_hash_block_header().try_into().unwrap(), 0x02, &validator_tx_vec_2).unwrap());
+
+    // let (result, blockchain) = blockchain.add_block(&validator_revoke_block);
+
+    // if !result {
+    //     println!("Blockchain failed to update due to invalid transaction or block");
+    // }
+
+    println!("Blockchain:");
+    println!("{:X?}", blockchain);
+    println!("");
+
+    let mut validator = Validator::new(config.get_validator_config(), &mut sending_wallet, &mut blockchain);
+    let next_block = validator.create_block();
+
+    println!("Blockchain:");
+    println!("{:X?}", blockchain);
+    println!("");
+
+    let (result, blockchain) = blockchain.add_block(&next_block.unwrap());
 
     if !result {
         println!("Blockchain failed to update due to invalid transaction or block");

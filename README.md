@@ -26,12 +26,17 @@ The configuration file is written in toml and contains various sections with opt
 wallet_file = "block.wallet"
 compressed_public_key = true
 wallet_file_version = 1
+[validator]
+propose_without_coinbase = true
 ```
 ### wallet
 The wallet section is for configuration options related to the wallet module\
 `wallet_file` - The path to the desired wallet file. Much like the config file if it doesn't exist it will be placed in the location that is specified.\
 `compressed_public_key` - Defines if the wallet should derive its address from a compressed public key or not.\
 `wallet_file_version` - The version of the wallet_file, it is unlikely for a new wallet file version to be implemented in the future.
+### validator
+The validator section is for configuration options related to the validator module\
+`propose_without_coinbase` - Defines if the validator module should propose blocks in the scenario where it cannot create a coinbase transaction. This will keep the winning validator from receiving the block subsidy AND any transaction fees. If the validator can create the coinbase transaction for a given block then it will include that transaction even if this settings is set to true
 
 ## features
 ### wallet
@@ -59,3 +64,6 @@ The accounts module identifies an account as is viewed by the blockchain. An acc
 
 ### blockchain
 The blockchain module keeps track of the current chain state. The chain state consists of a list of blocks and accounts. The blocks contain a list of all transactions within the blockchain created by the accounts. The state of each account on the blockchain is maintaed by the blockchain module updating each account through processing every transaction within every block. Before the blockchain will add any block to itself, it will pass the block through the verification_engine module to confirm that every transaction within said block is not only valid, but valid with the blockchain's current chain state.
+
+### validator
+The validator module is responsible for creating and pushing blocks to the blockchain. A validator will become a validator by sending a validator enable transaction to the network. The validator enable transaction stakes some amount of coins to be locked until the validator sends a valid validator revoke transaction. The validator revoke transaction will return the validator their staked coins. A random validator will be chosen every 5 minutes to propose a block to the network. Once the previous block has been proposed and accepted by the network the network can calculate the upcoming chosen validator, but that validator will not be able to propose a block until 5 minutes has passed or it will be considered invalid, other nodes of the network will verify this. For their work in securing and progressing the network validators will receive a block subsidy through a coinbase transaction included in the block as well as transactions fees that are attached to transactions within the block they are proposing.
