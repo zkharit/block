@@ -425,6 +425,15 @@ impl Blockchain {
         None
     }
 
+    pub fn get_block(&self, block_height: u64) -> Option<Block> {
+        if block_height > self.block_height {
+            None
+        } else {
+            // ToDo: this will need to change when not all blocks are stored in memory
+            Some(self.blocks[block_height as usize].clone())
+        }
+    }
+
     pub fn get_block_height(&self) -> u64 {
         self.block_height
     }

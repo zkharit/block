@@ -93,6 +93,11 @@ pub fn verify_transaction(transaction: &Transaction, block: Option<&Block>, bloc
                 None => return false
             };
 
+            // confirm the transaction amount is greater than 0
+            if transaction.amount <= 0 {
+                return false
+            }
+
             // confirm the sender's balance is at least the transaction amount and transaction fee
             if account_balance < (transaction.fee + transaction.amount) {
                 return false
@@ -333,7 +338,7 @@ pub fn get_block_subsidy(block_height: u64) -> u64 {
         return 0
     }
 
-    let mut block_reward = 50 * LOWEST_DENOMINATION_PER_COIN;
+    let mut block_reward = 50 * *LOWEST_DENOMINATION_PER_COIN as u64;
 
     block_reward >>= halvings;
 

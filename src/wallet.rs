@@ -1,10 +1,12 @@
+use std::fs::File;
+use std::io::{self, Write};
+use std::path::Path;
+
 use elliptic_curve::{SecretKey, sec1::ToEncodedPoint};
 use k256::{ecdsa::{SigningKey, Signature, signature::Signer}, PublicKey, Secp256k1};
 use rand_core::OsRng;
 use ripemd::Ripemd160;
 use sha2::{Sha256, Digest};
-
-use std::{ fs::File, io::{self, Write}, path::Path};
 
 use crate::block::{Block, BlockHeader};
 use crate::config::WalletConfig;
@@ -67,12 +69,22 @@ impl Wallet {
         self.address
     }
 
+    pub fn get_address_string(&self) -> String {
+        String::from_utf8(self.get_address().to_vec()).unwrap()
+    }
+
     pub fn get_nonce(&self) -> u64 {
         self.nonce
     }
 
     pub fn set_nonce(&mut self, n: u64) {
         self.nonce = n;
+        // update nonce in wallet file (also re-writes private key)
+        self.update_wallet_file();
+    }
+
+    pub fn increment_nonce(&mut self) {
+        self.nonce += 1;
         // update nonce in wallet file (also re-writes private key)
         self.update_wallet_file();
     }
@@ -91,9 +103,6 @@ impl Wallet {
         // create the transaction
         let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, recipient, sender_pub_key, tx_sig, self.nonce);
 
-        // increment the wallet nonce after the transaction was created
-        self.set_nonce(self.nonce + 1);
-
         Some(tx)
     }
 
@@ -110,8 +119,6 @@ impl Wallet {
         // create the transaction
         let tx = Transaction::new(*TRANSACTION_VERSION, amount, 0, recipient, sender_pub_key, tx_sig, 0);
 
-        // coinbase transactions do not use nor increment the wallet nonce
-
         Some(tx)
     }
 
@@ -126,9 +133,6 @@ impl Wallet {
         let sender_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = sender_pub_key_vec.try_into().unwrap();
 
         let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, *VALIDATOR_ENABLE_RECIPIENT, sender_pub_key, tx_sig, self.nonce);
-        
-        // increment the wallet nonce after the transaction is created
-        self.set_nonce(self.nonce + 1);
 
         Some(tx)
     }
@@ -144,9 +148,6 @@ impl Wallet {
         let sender_pub_key: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = sender_pub_key_vec.try_into().unwrap();
 
         let tx = Transaction::new(*TRANSACTION_VERSION, amount, fee, *VALIDATOR_REVOKE_RECIPIENT, sender_pub_key, tx_sig, self.nonce);
-
-        // increment the wallet nonce after the transaction is created
-        self.set_nonce(self.nonce + 1);
 
         Some(tx)
     }
@@ -298,7 +299,6 @@ impl Wallet {
         decoded_private_key_checksum.push(decoded_private_key.pop()?);
         decoded_private_key_checksum.push(decoded_private_key.pop()?);
 
-        // ToDo: need to check the checksum?
         // reverse the checksum vector so it is in the correct order
         decoded_private_key_checksum.reverse();
 
@@ -328,6 +328,36 @@ impl Wallet {
         };
 
         Some(private_key)
+    }
+
+    pub fn check_address_checksum(&self, address: [u8; BLOCK_ADDRESS_SIZE]) -> bool {
+        // decode the received address
+        let mut decoded_address = match bs58::decode(address).into_vec() {
+            Ok(decoded_address) => decoded_address,
+            Err(_) => return false
+        };
+
+        // remove the final 4 checksum bytes from the decoded address
+        let checksum: Vec<u8> = decoded_address.drain(decoded_address.len() - 4..).collect();
+
+        // double sha256 the decoded address without the checksum bytes
+        let mut sha256_hasher: Sha256 = Sha256::new();
+        sha256_hasher.update(&decoded_address);
+        let first_sha256 = sha256_hasher.finalize();
+
+        let mut sha256_hasher: Sha256 = Sha256::new();
+        sha256_hasher.update(first_sha256);
+        let mut second_sha256 = sha256_hasher.finalize().to_vec();
+
+        // truncate the hash of the received address to the first 4 bytes
+        second_sha256.truncate(4);
+
+        // compare the checksum with the obtained checksum and make sure they match
+        if second_sha256 != checksum {
+            return false
+        }
+
+        true
     }
 
     fn get_signing_key(&self) -> Option<SigningKey> {
@@ -373,6 +403,13 @@ impl Wallet {
         };
 
         Some(private_key)
+    }
+
+    pub fn get_private_key_string(&self) -> Option<String> {
+        match self.get_private_key() {
+            Some(private_key) => Some(String::from_utf8(Self::generate_wif_private_key(&private_key, self.config.get_compressed_public_key())).unwrap()),
+            None => None
+        }
     }
 
     fn generate_wallet_file(wallet_file_path: &Path, compressed: bool, wallet_file_version: u64) -> Result<File, io::Error> {
