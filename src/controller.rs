@@ -221,7 +221,7 @@ impl Controller {
         let mut tx_vec: Vec<Transaction> = vec![];
 
         // create coinbase transaction for this block
-        match self.wallet.create_coinbase_tx(verification_engine::get_block_subsidy(block_height), self.wallet.get_address()) {
+        match self.wallet.create_coinbase_tx(verification_engine::get_block_subsidy(block_height + 1), self.wallet.get_address()) {
             Some(coinbase_tx) => tx_vec.push(coinbase_tx),
             // if coinbase_tx cannot be created either do not propose the block or propose it without a coinbase transaction depending on config
             None =>  {

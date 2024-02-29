@@ -391,7 +391,8 @@ impl Blockchain {
         }
 
         // if the blockchain is out of the bootstrapping phase mod the bottom 64 bits integer with the total amount the validator_list has staked
-        if self.get_block_height() > *BOOTSTRAPPING_PHASE_BLOCK_HEIGHT {
+        if self.get_block_height() > *BOOTSTRAPPING_PHASE_BLOCK_HEIGHT && total_stake != 0 {
+            // ToDo: need to implement validators unstaking all their tokens at BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, need to think about blockchain state
             let winning_number = bottom_64_as_integer % total_stake;
 
             // iterate through the validator list (order here matters) and add each stake until youve reached the the winning stake number
