@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+use std::env;
 use std::time::SystemTime;
-use std::{path::PathBuf, env};
+use std::path::PathBuf;
+
+use k256::PublicKey;
 
 use crate::account::Account;
 use crate::block::Block;
@@ -11,7 +15,7 @@ use crate::validator::Validator;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, BLOCK_VERSION, DEFAULT_CONFIG_FILE_NAME, LOOSE_CHANGE_RECIPIENT, LOWEST_DENOMINATION_PER_COIN, MAX_TRANSACTIONS_PER_BLOCK, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, BLOCK_VERSION, COMPRESSED_PUBLIC_KEY_SIZE, DEFAULT_CONFIG_FILE_NAME, LOOSE_CHANGE_RECIPIENT, LOWEST_DENOMINATION_PER_COIN, MAX_TRANSACTIONS_PER_BLOCK, VALIDATOR_ENABLE_RECIPIENT};
 
 pub struct Controller {
     config: Config,
@@ -129,8 +133,8 @@ impl Controller {
         self.blockchain.get_account(address)
     }
 
-    pub fn blockchain_get_mempool(&self) -> Vec<Transaction> {
-        self.blockchain.get_mempool()
+    pub fn blockchain_get_mempool(&self) -> HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> {
+        self.blockchain.get_mempool_clone()
     }
 
     pub fn blockchain_get_validators(&self) -> Vec<ValidatorAccount> {
@@ -229,17 +233,150 @@ impl Controller {
             }
         };
 
-        // get a clone the mempool
-        let mut mempool_transactions = self.blockchain.get_mempool();
+        // ToDo: need a way to prune mempool transactions, uneeded accounts, unhelpful validators from blockchain
 
-        // truncate the mempool to the first MAX_TRANSACTIONS_PER_BLOCK - 1 (because of the coinbase) to the block
-        mempool_transactions.truncate(MAX_TRANSACTIONS_PER_BLOCK - 1);
+        // get a list of the accounts on the blockchain, used for nonce checking later
+        let mut blockchain_accounts = self.blockchain.get_accounts();
 
-        // remove as many transactions from the mempool that are to be added to the upcoming block
-        self.blockchain.remove_from_mempool(mempool_transactions.len() as u64);
+        // get a reference to the mempool
+        let mempool = self.blockchain.get_mempool();
 
-        // add the truncated ordered mempool to the transaction vector
-        tx_vec.append(&mut mempool_transactions);
+        // iterate through the mempool while there are transactions left in it, or the tx_vec is at MAX_TRANSACTION-PER_BLOCK
+        while !mempool.is_empty() && tx_vec.len() < *MAX_TRANSACTIONS_PER_BLOCK {
+            // hold the address and max fee found from the first transaction of each account's transaction vector in the mempool hashmap
+            let mut max_transaction_fee_sender: [u8; COMPRESSED_PUBLIC_KEY_SIZE] = [0x00; COMPRESSED_PUBLIC_KEY_SIZE];
+            let mut max_transaction_fee: Option<u64> = None;
+
+            // iterate through each account that has a transaction in the mempool, and check its first (earliest nonce) transaction and check if its fee is higher than the max already found fee
+            for (sender, transactions) in mempool.clone() {
+                match max_transaction_fee {
+                    // if there already is a max_transaction_fee compare the current transaction's fee to the max transaction fee
+                    Some(max_fee) => {
+                        // if the current transaction's fee is higher than the max trnasaction fee then confirm the nonce is correct for this transaction
+                        if transactions[0].fee > max_fee {
+                            // get the account public key
+                            let account_pub_key = match PublicKey::from_sec1_bytes(&sender) {
+                                Ok(account_pub_key) => account_pub_key,
+                                // if an invalid public key is received then the transaction is invalid
+                                Err(_) => continue
+                            };
+
+                            // get the address for the account public key
+                            let account_address = Wallet::generate_address(&account_pub_key, true);
+
+                            // obtain the account nonce in the blockchains view
+                            let tx_account_nonce = match blockchain_accounts.get(&account_address) {
+                                Some(tx_account) => {
+                                    tx_account.get_nonce()
+                                }
+                                None => {
+                                    // if the account isn't in the blockchain yet, then the nonce needs to be 0
+                                    0
+                                }
+                            };
+
+                            if tx_account_nonce == transactions[0].nonce {
+                                // if the transaction nonce matches the account nonce on the blockchain then mark this transaction as the new max fee
+                                max_transaction_fee_sender = sender;
+                                max_transaction_fee = Some(transactions[0].fee);
+                            } 
+
+                            if transactions[0].nonce < tx_account_nonce {
+                                // if the user has sent a transaction with a nonce less than their account nonce, remove it from the mempool because this will never be a valid transaction
+                                // get the sender's tx vec
+                                let sender_tx_vec = mempool.get_mut(&sender).unwrap();
+
+                                // remove the transaction from the mempool
+                                sender_tx_vec.remove(0);
+
+                                // if the sender has no more transactions remove their entry from the mempool hash map
+                                if sender_tx_vec.len() == 0 {
+                                    mempool.remove(&sender);
+                                }
+                            }
+                        }
+                    },
+                    // if there is no max transaction fee yet then add the first transaction that has a valid nonce
+                    None => {
+                        // get the account public key
+                        let account_pub_key = match PublicKey::from_sec1_bytes(&sender) {
+                            Ok(account_pub_key) => account_pub_key,
+                            // if an invalid public key is received then the transaction is invalid
+                            Err(_) => continue
+                        };
+
+                        // get the address for the account public key
+                        let account_address = Wallet::generate_address(&account_pub_key, true);
+
+                        // obtain the account nonce in the blockchains view
+                        let tx_account_nonce = match blockchain_accounts.get(&account_address) {
+                            Some(tx_account) => {
+                                tx_account.get_nonce()
+                            }
+                            None => {
+                                // if the account isn't in the blockchain yet, then the nonce needs to be 0
+                                0
+                            }
+                        };
+
+                        // if the transaction nonce matches the account nonce on the blockchain then mark this transaction as the new max fee
+                        if tx_account_nonce == transactions[0].nonce {
+                            max_transaction_fee_sender = sender;
+                            max_transaction_fee = Some(transactions[0].fee);
+
+                            continue;
+                        }
+                        
+                        if transactions[0].nonce < tx_account_nonce {
+                            // if the user has sent a transaction with a nonce less than their account nonce, remove it from the mempool because this will never be a valid transaction
+                            // get the sender's tx vec
+                            let sender_tx_vec = mempool.get_mut(&transactions[0].sender).unwrap();
+
+                            // remove the transaction from the mempool
+                            sender_tx_vec.remove(0);
+
+                            // if the sender has no more transactions remove their entry from the mempool hash map
+                            if sender_tx_vec.len() == 0 {
+                                mempool.remove(&transactions[0].sender);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // if the max fee transaction was updated then add it to the tx vec and remove it from the mempool
+            if max_transaction_fee_sender != [0x00; COMPRESSED_PUBLIC_KEY_SIZE] {
+                // get the sender's tx vec with the highest transaction fee for this iteration
+                let sender_tx_vec = mempool.get_mut(&max_transaction_fee_sender).unwrap();
+
+                // push their transaction into the tx_vec for the block
+                tx_vec.push(sender_tx_vec[0].clone());
+
+                // remove the transaction from the mempool
+                sender_tx_vec.remove(0);
+
+                // if the sender has no more transactions remove their entry from the mempool hash map
+                if sender_tx_vec.len() == 0 {
+                    mempool.remove(&max_transaction_fee_sender);
+                }
+
+                // after a transaction is added to the block update the account nonce (in the blockchain account CLONE NOT the actual blockchain) so that multiple transactions per account can be added per block
+                // get the account public key
+                let account_pub_key = match PublicKey::from_sec1_bytes(&max_transaction_fee_sender) {
+                    Ok(account_pub_key) => account_pub_key,
+                    // if an invalid public key is received then the transaction is invalid
+                    Err(_) => continue
+                };
+
+                // get the address for the account public key
+                let account_address = Wallet::generate_address(&account_pub_key, true);
+
+                blockchain_accounts.get_mut(&account_address).unwrap().increase_nonce();
+            } else {
+                // if the max fee transaction was never updated then there are no valid transactions in the mempool
+                break;
+            }
+        }
 
         // get the current timestamp
         let timestamp = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {

@@ -21,8 +21,8 @@ pub struct Blockchain {
     accounts: HashMap<[u8; BLOCK_ADDRESS_SIZE], Account>,
     // vector of all validators on the blockchain
     validators: Vec<ValidatorAccount>,
-    // sorted list of unconfirmed transactions by fee
-    mempool: Vec<Transaction>,
+    // mempool hashmap of accounts and all of the transactions they have added to the mempool sorted by nonce
+    mempool: HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>>,
     // the current blockheight
     block_height: u64
 }
@@ -43,8 +43,8 @@ impl Blockchain {
         // create validator set
         let validators: Vec<ValidatorAccount> = vec![];
 
-        // create mempool
-        let mempool: Vec<Transaction> = vec![];
+        // create mempool hashmap
+        let mempool: HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> = HashMap::new();
 
         let block_height = 0;
 
@@ -88,12 +88,21 @@ impl Blockchain {
     }
 
     pub fn add_transaction_mempool(&mut self, transaction: &Transaction) -> bool {
-        // ToDo: need to allow multiple transactions from the same sender to be in the mempool (nonce checking issue)
         // verify the received transaction
         if verification_engine::verify_transaction(transaction, None, self) {
-            // if it is valid add it to the mempool
-            self.mempool.push(transaction.clone());
-            self.mempool.sort();
+            // insert the transaction into the account nonce sorted mempool hashmap
+            match self.mempool.get_mut(&transaction.sender) {
+                Some(transaction_vec) => {
+                    // add the transcation to the account/vec<transaction> hashmap
+                    transaction_vec.push(transaction.clone());
+                    // sort the accounts vec<transaction> by account nonce
+                    self.mempool.get_mut(&transaction.sender).unwrap().sort();
+                },
+                None => {
+                    // create new account/vec<transaction> entry in the mempool
+                    self.mempool.insert(transaction.sender, vec![transaction.clone()]);
+                }
+            }
         } else {
             return false
         }
@@ -450,16 +459,19 @@ impl Blockchain {
         self.block_height += 1;
     }
 
+    pub fn get_accounts(&self) -> HashMap<[u8; BLOCK_ADDRESS_SIZE], Account> {
+        self.accounts.clone()
+    }
+
     pub fn get_validators(&self) -> Vec<ValidatorAccount> {
         self.validators.clone()
     }
 
-    pub fn get_mempool(&self) -> Vec<Transaction> {
-        self.mempool.clone()
+    pub fn get_mempool(&mut self) -> &mut HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> {
+        &mut self.mempool
     }
 
-    pub fn remove_from_mempool(&mut self, transaction_count: u64) {
-        // removes the first "transaction_count" transactions from the mempool 
-        self.mempool = self.mempool.drain(transaction_count as usize..).collect();
+    pub fn get_mempool_clone(&self) -> HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> {
+        self.mempool.clone()
     }
 }

@@ -73,13 +73,13 @@ impl Transaction {
 
 impl Ord for Transaction {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        (other.fee).cmp(&self.fee)
+        (self.nonce).cmp(&other.nonce)
     }
 }
 
 impl PartialOrd for Transaction {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.fee.cmp(&self.fee))
+        Some(self.nonce.cmp(&other.nonce))
     }
 }
 

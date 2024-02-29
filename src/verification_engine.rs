@@ -44,9 +44,15 @@ pub fn verify_transaction(transaction: &Transaction, block: Option<&Block>, bloc
             }
         };
 
-        // make sure the account nonce in view of the blockchain is the same as the transaction nonce 
-        if transaction.nonce != tx_account_nonce {
-            return false
+        match block {
+            // only need to check the transaction nonce if the transactoin is being added to a block, not when its being added to the mempool
+            Some(_) => {
+                // make sure the account nonce in view of the blockchain is the same as the transaction nonce
+                if transaction.nonce != tx_account_nonce {
+                    return false
+                }
+            },
+            None => ()
         }
 
         // check for proper balances
