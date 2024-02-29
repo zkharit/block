@@ -7,7 +7,7 @@ pub fn open_file_read(path: &Path) -> Result<File, io::Error> {
 
 // open a file for writing
 pub fn open_file_write(path: &Path) -> Result<File, io::Error> {
-    OpenOptions::new().write(true).read(true).open(path)
+    OpenOptions::new().write(true).truncate(true).read(true).open(path)
 }
 
 // create a file FAIL if the file already exists
