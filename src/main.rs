@@ -391,16 +391,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                             continue;
                         }
 
-                        // confirm the user has entered a number larger than 1 bit
-                        if amount < 0.00000001 {
-                            println!("Enter an amount larger than 0.00000001 (1 bit)");
-                            println!();
-                            continue;
-                        }
-
                         // ensure the user has entered a prcision of 8 deicmal places or less
-                        let amount_string_split = amount_string.split('.');
-                        let amount_string_parts = amount_string_split.collect::<Vec<&str>>();
+                        let amount_string_parts = amount_string.split('.').collect::<Vec<&str>>();
                         if amount_string_parts.len() == 2 {
                             if amount_string_parts[1].len() > 8 {
                                 println!("Please enter an amount of block with a maximum of 8 decmal places (0.00000001 = 1 bit)");
@@ -440,16 +432,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                                 continue;
                             }
 
-                            // confirm the user has entered a number larger than 1 bit
-                            if fee < 0.00000001 {
-                                println!("Enter a fee larger than 0.00000001 (1 bit)");
-                                println!();
-                                continue;
-                            }
-
                             // ensure the user has entered a prcision of 8 deicmal places or less
-                            let fee_string_split = fee_string.split('.');
-                            let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                            let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                             if fee_string_parts.len() == 2 {
                                 if fee_string_parts[1].len() > 8 {
                                     println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
@@ -507,16 +491,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                         continue;
                     }
 
-                    // confirm the user has entered a number larger than 1 bit
-                    if amount < 0.00000001 {
-                        println!("Enter an amount larger than 0.00000001 (1 bit)");
-                        println!();
-                        continue;
-                    }
-
                     // ensure the user has entered a prcision of 8 deicmal places or less
-                    let amount_string_split = amount_string.split('.');
-                    let amount_string_parts = amount_string_split.collect::<Vec<&str>>();
+                    let amount_string_parts = amount_string.split('.').collect::<Vec<&str>>();
                     if amount_string_parts.len() == 2 {
                         if amount_string_parts[1].len() > 8 {
                             println!("Please enter an amount of BLO with a maximum of 8 decmal places (0.00000001 = 1 bit)");
@@ -556,16 +532,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                             continue;
                         }
 
-                        // confirm the user has entered a number larger than 1 bit
-                        if fee < 0.00000001 {
-                            println!("Enter a fee larger than 0.00000001 (1 bit)");
-                            println!();
-                            continue;
-                        }
-
                         // ensure the user has entered a prcision of 8 deicmal places or less
-                        let fee_string_split = fee_string.split('.');
-                        let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                        let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                         if fee_string_parts.len() == 2 {
                             if fee_string_parts[1].len() > 8 {
                                 println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
@@ -639,16 +607,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                         continue;
                     }
 
-                    // confirm the user has entered a number larger than 1 bit
-                    if fee < 0.00000001 {
-                        println!("Enter a fee larger than 0.00000001 (1 bit)");
-                        println!();
-                        continue;
-                    }
-
                     // ensure the user has entered a prcision of 8 deicmal places or less
-                    let fee_string_split = fee_string.split('.');
-                    let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                    let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                     if fee_string_parts.len() == 2 {
                         if fee_string_parts[1].len() > 8 {
                             println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
