@@ -95,7 +95,7 @@ fn output_options(controller: &mut Controller) {
                 println!();
 
                 match final_input.as_str() {
-                    "yes" | "y" => break,
+                    "yes" => break,
                     _ => continue
                 }
             }
@@ -126,7 +126,7 @@ fn perform_wallet_options(controller: &mut Controller) {
                 println!();
             },
             "3" | "3." | "view balance" | "balance" => {
-                println!("Balance: {:.8}", controller.wallet_get_balance());
+                println!("Balance: {:.8} BLO", controller.wallet_get_balance());
                 println!();
             },
             "4" | "4." | "view nonce" => {
@@ -174,8 +174,8 @@ fn perform_wallet_options(controller: &mut Controller) {
     }
 }
 
-fn perform_blockhain_options(controller: &Controller) {
-    let blockchain_options = vec!["Blockchain Options:", "View Overview", "View block height", "View block", "View transaction", "View address", "View mempool", "View validators", "View total staked", "View total loose change", "Back"];
+fn perform_blockhain_options(controller: &mut Controller) {
+    let blockchain_options = vec!["Blockchain Options:", "View Overview", "View block height", "View block", "View transaction", "View address", "View mempool", "View validators", "View total staked", "View total loose change", "Prune mempool", "Back"];
 
     loop {
         // present blockchain options to user
@@ -293,14 +293,30 @@ fn perform_blockhain_options(controller: &Controller) {
                 println!();
             },
             "8" | "8." | "view total staked"  | "total staked" | "staked" => {
-                println!("Total staked on block: {}", controller.blockchain_get_total_staked());
+                println!("Total staked on block: {:.8} BLO", controller.blockchain_get_total_staked() as f64 / LOWEST_DENOMINATION_PER_COIN);
                 println!();
             },
-            "9" | "9." | "View total loose change"  | "view loose change" | "loose change" | "change" => {
-                println!("Total loose change: {}", controller.blockchain_get_total_change());
+            "9" | "9." | "view total loose change"  | "view loose change" | "loose change" | "change" => {
+                println!("Total loose change: {:.8} BLO", controller.blockchain_get_total_change() as f64 / LOWEST_DENOMINATION_PER_COIN);
                 println!();
             },
-            "10" | "10." | "back" => {
+            "10" | "10." | "prune mempool" => {
+                // confirm with user that they want to clear the mempool
+                println!("This will clear your current mempool, you will not be able to confirm/view any of the previously broadcasted to you");
+                println!("Do you want to clear your mempool? (yes/no)");
+                let prune_option = read_string();
+                println!();
+
+                // prune the mempool if the user entered yes
+                match prune_option.as_str() {
+                    "yes" => controller.blockchain_prune_mempool(),
+                    _ => continue
+                }
+                
+                println!("Mempool pruned");
+                println!();
+            },
+            "11" | "11." | "back" => {
                 break;
             },
             _ => {}
@@ -352,8 +368,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                     loop {
                         // prompt the user for the amount theyd like to send
                         let balance = controller.wallet_get_balance();
-                        println!("Current balance: {:.8}", balance);
-                        println!("Enter the amount youd like to send or \"exit\":");
+                        println!("Current balance: {:.8} BLO", balance);
+                        println!("Enter the amount of BLO you'd like to send or \"exit\":");
                         let amount_string = read_string();
                         println!();
 
@@ -375,6 +391,24 @@ fn perform_transaction_options(controller: &mut Controller) {
                             continue;
                         }
 
+                        // confirm the user has entered a number larger than 1 bit
+                        if amount < 0.00000001 {
+                            println!("Enter an amount larger than 0.00000001 (1 bit)");
+                            println!();
+                            continue;
+                        }
+
+                        // ensure the user has entered a prcision of 8 deicmal places or less
+                        let amount_string_split = amount_string.split('.');
+                        let amount_string_parts = amount_string_split.collect::<Vec<&str>>();
+                        if amount_string_parts.len() == 2 {
+                            if amount_string_parts[1].len() > 8 {
+                                println!("Please enter an amount of block with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                println!();
+                                continue;
+                            }
+                        }
+
                         // confirm the user has sufficient funds 
                         if amount > balance {
                             println!("Insufficient funds");
@@ -384,7 +418,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                         
                         loop {
                             // prompt the user for the fee theyd like to use
-                            println!("Enter the fee youd like to attach to your transaction or \"exit\":");
+                            println!("Enter the fee you'd like to attach to your transaction (in BLO) or \"exit\":");
                             let fee_string = read_string();
                             println!();
                             
@@ -406,13 +440,31 @@ fn perform_transaction_options(controller: &mut Controller) {
                                 continue;
                             }
 
+                            // confirm the user has entered a number larger than 1 bit
+                            if fee < 0.00000001 {
+                                println!("Enter a fee larger than 0.00000001 (1 bit)");
+                                println!();
+                                continue;
+                            }
+
+                            // ensure the user has entered a prcision of 8 deicmal places or less
+                            let fee_string_split = fee_string.split('.');
+                            let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                            if fee_string_parts.len() == 2 {
+                                if fee_string_parts[1].len() > 8 {
+                                    println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                    println!();
+                                    continue;
+                                }
+                            }
+
                             // confirm the user has sufficient funds
                             if fee > balance - amount {
                                 println!("Insufficient funds");
                                 println!();
                                 continue;
                             }
-                            
+
                             // create and broadcast the transaction
                             if controller.transaction_create_a_b(address_arr, (amount * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64, (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
                                 println!("Successfully broadcast transaction");
@@ -432,8 +484,8 @@ fn perform_transaction_options(controller: &mut Controller) {
                 loop {
                     // prompt the user for the amount theyd like to stake
                     let balance = controller.wallet_get_balance();
-                    println!("Current balance: {:.8}", balance);
-                    println!("Enter the amount you'd like to stake or \"exit\":");
+                    println!("Current balance: {:.8} BLO", balance);
+                    println!("Enter the amount of BLO you'd like to stake or \"exit\":");
                     let amount_string = read_string();
                     println!();
 
@@ -455,6 +507,24 @@ fn perform_transaction_options(controller: &mut Controller) {
                         continue;
                     }
 
+                    // confirm the user has entered a number larger than 1 bit
+                    if amount < 0.00000001 {
+                        println!("Enter an amount larger than 0.00000001 (1 bit)");
+                        println!();
+                        continue;
+                    }
+
+                    // ensure the user has entered a prcision of 8 deicmal places or less
+                    let amount_string_split = amount_string.split('.');
+                    let amount_string_parts = amount_string_split.collect::<Vec<&str>>();
+                    if amount_string_parts.len() == 2 {
+                        if amount_string_parts[1].len() > 8 {
+                            println!("Please enter an amount of BLO with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                            println!();
+                            continue;
+                        }
+                    }
+
                     // confirm the user has sufficient funds
                     if amount > balance {
                         println!("Insufficient funds");
@@ -464,7 +534,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                     
                     loop {
                         // prompt the user for the fee theyd like to use
-                        println!("Enter the fee youd like to attach to your transaction or \"exit\":");
+                        println!("Enter the fee you'd like to attach to your transaction (in BLO) or \"exit\":");
                         let fee_string = read_string();
                         println!();
                         
@@ -484,6 +554,24 @@ fn perform_transaction_options(controller: &mut Controller) {
                             println!("Enter a positive number for the fee");
                             println!();
                             continue;
+                        }
+
+                        // confirm the user has entered a number larger than 1 bit
+                        if fee < 0.00000001 {
+                            println!("Enter a fee larger than 0.00000001 (1 bit)");
+                            println!();
+                            continue;
+                        }
+
+                        // ensure the user has entered a prcision of 8 deicmal places or less
+                        let fee_string_split = fee_string.split('.');
+                        let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                        if fee_string_parts.len() == 2 {
+                            if fee_string_parts[1].len() > 8 {
+                                println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                println!();
+                                continue;
+                            }
                         }
 
                         // confirm the user has sufficient funds
@@ -524,12 +612,12 @@ fn perform_transaction_options(controller: &mut Controller) {
                         }
                     };
 
-                    println!("This will revoke your entire stake of: {:.8}", account.get_stake());
+                    println!("This will revoke your entire stake of: {:.8} BLO", account.get_stake());
 
                     // prompt the user for the fee theyd like to use
                     let balance = controller.wallet_get_balance();
-                    println!("Current balance: {:.8}", balance);
-                    println!("Enter the fee youd like to attach to your transaction or \"exit\":");
+                    println!("Current balance: {:.8} BLO", balance);
+                    println!("Enter the fee you'd like to attach to your transaction (in BLO) or \"exit\":");
                     let fee_string = read_string();
                     println!();
 
@@ -549,6 +637,24 @@ fn perform_transaction_options(controller: &mut Controller) {
                         println!("Enter a positive number for the fee");
                         println!();
                         continue;
+                    }
+
+                    // confirm the user has entered a number larger than 1 bit
+                    if fee < 0.00000001 {
+                        println!("Enter a fee larger than 0.00000001 (1 bit)");
+                        println!();
+                        continue;
+                    }
+
+                    // ensure the user has entered a prcision of 8 deicmal places or less
+                    let fee_string_split = fee_string.split('.');
+                    let fee_string_parts = fee_string_split.collect::<Vec<&str>>();
+                    if fee_string_parts.len() == 2 {
+                        if fee_string_parts[1].len() > 8 {
+                            println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                            println!();
+                            continue;
+                        }
                     }
 
                     // confirm the user has sufficient funds

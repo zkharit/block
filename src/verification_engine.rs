@@ -158,6 +158,11 @@ pub fn verify_block(block: Block, blockchain: &Blockchain) -> bool {
     // initial validator list that can be chosen from to get the block proposer 
     let mut validator_list = blockchain.get_validators().clone();
 
+    // if there are no validators on the blockchain, then game over no new blocks can be added
+    if validator_list.len() == 0 {
+        return false
+    }
+
     for i in 0..blockchain.get_validators().len() {
         // obtain the public key of the validator that was chosen to propose this block and use use the previously chosen validatyor pub key (if there was one) as a "seed" for choosing the next validator 
         (proposer_pub_key, proposer_pub_key_index) = match blockchain.calculate_proposer(validator_list.clone(), previous_validator_pub_key) {

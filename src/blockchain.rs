@@ -10,7 +10,7 @@ use crate::validator_account::ValidatorAccount;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECIPIENT, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, COMPRESSED_PUBLIC_KEY_SIZE, GENESIS_BLOCK, LOOSE_CHANGE_RECIPIENT, MINIMUM_STAKING_AMOUNT, VALIDATOR_ENABLE_RECIPIENT};
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -83,6 +83,12 @@ impl Blockchain {
 
         // increment the block height
         new_blockchain.increase_block_height();
+
+        // once the BOOBOOTSTRAPPING_PHASE_BLOCK_HEIGHT has been reached, all validators staking less than MINIMUM_STAKING_AMOUNT need to be unstaked
+        if new_blockchain.get_block_height() == *BOOTSTRAPPING_PHASE_BLOCK_HEIGHT {
+            // unstake all validators staking less than MINIMUM_STAKING_AMOUNT
+            new_blockchain.bootstrapping_phase_end()
+        }
 
         (true, new_blockchain)
     }
@@ -392,7 +398,6 @@ impl Blockchain {
 
         // if the blockchain is out of the bootstrapping phase mod the bottom 64 bits integer with the total amount the validator_list has staked
         if self.get_block_height() > *BOOTSTRAPPING_PHASE_BLOCK_HEIGHT && total_stake != 0 {
-            // ToDo: need to implement validators unstaking all their tokens at BOOTSTRAPPING_PHASE_BLOCK_HEIGHT, need to think about blockchain state
             let winning_number = bottom_64_as_integer % total_stake;
 
             // iterate through the validator list (order here matters) and add each stake until youve reached the the winning stake number
@@ -427,12 +432,48 @@ impl Blockchain {
             // if the blockchain is in the bootstrapping phase mod the bottom 64 bits integer with the total amount of validators
             // this prevents a scenario where if 1 validator has staked some coins and none of the others have, the one validator that has staked coins will always be the chosen validator
             // this allows for an attack vector on the network, since you can create unlimited accounts for free (during the bootstrapping phase)
-            let winning_number = bottom_64_as_integer % TryInto::<u64>::try_into(validator_list.len()).unwrap();
-            return Some((validator_list[winning_number as usize].get_public_key(), winning_number as usize))
+            if validator_list.len() != 0 {
+                let winning_number = bottom_64_as_integer % TryInto::<u64>::try_into(validator_list.len()).unwrap();
+                return Some((validator_list[winning_number as usize].get_public_key(), winning_number as usize))
+            }
         }
 
-        // Should never get here, but in this scenario return none
+        // if there are no validators on the blockchain there is no possible proposer
         None
+    }
+
+    fn bootstrapping_phase_end(&mut self) {
+        for (index, validator) in self.get_validators().iter().enumerate() {
+            // get the validators account on the blockchain to check their stake
+            // get the validators public key
+            let validator_pub_key = match PublicKey::from_sec1_bytes(&validator.get_public_key()) {
+                Ok(validator_pub_key) => validator_pub_key,
+                // should never get here
+                Err(_) => continue
+            };
+
+            // get the address for the account public key
+            let account_address = Wallet::generate_address(&validator_pub_key, true);
+
+            // get the validator account
+            let validator_account = match self.accounts.get_mut(&account_address) {
+                Some(validator_account) => validator_account,
+                // Should never get here
+                None => continue
+            };
+
+            // ge tthe validators stake
+            let validator_stake = validator_account.get_stake();
+
+            // if validator stake is less than MINIMUM_STAKING_AMOUNT then unstake
+            if validator_stake < *MINIMUM_STAKING_AMOUNT {
+                // return their stake, remove them as a validator, remove them from validator list
+                validator_account.increase_balance(validator_stake);
+                validator_account.set_stake(0);
+                validator_account.set_validator(false);
+                self.validators.remove(index);
+            }
+        }
     }
 
     pub fn get_block(&self, block_height: u64) -> Option<Block> {
@@ -474,5 +515,9 @@ impl Blockchain {
 
     pub fn get_mempool_clone(&self) -> HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> {
         self.mempool.clone()
+    }
+
+    pub fn clear_mempool(&mut self) {
+        self.mempool.clear()
     }
 }

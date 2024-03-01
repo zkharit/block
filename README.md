@@ -2,7 +2,7 @@
 An elementary account based POS blockchain written in Rust
 
 ## description
-block is a POS blockchain utilizing many of the same crypto primitives as Bitcoin, but instead of being UTXO based it is account based. block's consensus model randomly chooses a validator with chances proportional to the amount of funds that each validator has staked to propose a new block every 5 minutes.
+block is a proof-of-stake (POS) blockchain utilizing many of the same crypto primitives as Bitcoin, but instead of being UTXO based it is account based. block is both the currency name (BLO) and the protocol name, and can be subdivided into the smallest unit of the currency, a bit (0.00000001 BLO). block's consensus model randomly chooses a validator with chances proportional to the amount of funds that each validator has staked to propose a new block every 5 minutes. Validators will be rewarded for proposing valid blocks by being rewarded a block subsidy and the transaction fees of the block they propose. The block subsidy will initially be 50 BLO and halve every 210,000 blocks. To promote initial liquidity in the network, validators will not have to stake any BLO for the initial bootstrapping phase which will last for 105,000 blocks. After this time all validators staking less than the minimum staking amount, 32 BLO, will have their stake returned and will no longer be considered a validator of the network until they decide to re-stake at least the minimum staking amount of BLO.
 
 ## documentation
 Full documentation on the block protocol can be found here (coming soon).

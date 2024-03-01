@@ -155,6 +155,10 @@ impl Controller {
         }
     }
 
+    pub fn blockchain_prune_mempool(&mut self) {
+        self.blockchain.clear_mempool()
+    }
+
     pub fn transaction_create_a_b(&mut self, recipient: [u8; BLOCK_ADDRESS_SIZE], amount: u64, fee: u64) -> bool {
         // ToDo: need to broadcast transaction to network
         let tx = match self.wallet.create_tx(amount, fee, recipient) {
@@ -233,7 +237,7 @@ impl Controller {
             }
         };
 
-        // ToDo: need a way to prune mempool transactions, uneeded accounts, unhelpful validators from blockchain
+        // ToDo: need a way to prune uneeded accounts (can only be done when storage is implemented because of nonce), unhelpful validators from blockchain
 
         // get a list of the accounts on the blockchain, used for nonce checking later
         let mut blockchain_accounts = self.blockchain.get_accounts();
