@@ -28,6 +28,9 @@ compressed_public_key = true
 wallet_file_version = 1
 [validator]
 propose_without_coinbase = true
+[network]
+local_blockchain = true
+peer_list = ["127.0.0.1:28475"]
 "#;
 // version bytes used to indicate block version
 pub const BLOCK_VERSION: &'static u32 = &0x01;

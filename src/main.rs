@@ -4,6 +4,7 @@ mod blockchain;
 mod config;
 mod constants;
 mod controller;
+mod network;
 mod transaction;
 mod wallet;
 mod validator;
@@ -644,7 +645,7 @@ fn perform_transaction_options(controller: &mut Controller) {
 }
 
 fn perform_about_options(controller: &Controller) {
-    let about_options = vec!["About options", "Node version", "Wallet config values", "Validator config values", "Back"];
+    let about_options = vec!["About options", "Node version", "Wallet config values", "Validator config values", "Network config values", "Back"];
 
     loop {
         // present transaction options to user
@@ -668,8 +669,13 @@ fn perform_about_options(controller: &Controller) {
                 println!("Validator config values:");
                 println!("{:?}", controller.about_validator_config());
                 println!();
-            }
-            "4" | "4." | "back" => {
+            },
+            "4" | "4." | "network config values" | "network config" | "network" => {
+                println!("Nalidator config values:");
+                println!("{:?}", controller.about_network_config());
+                println!();
+            },
+            "5" | "5." | "back" => {
                 break;
             },
             _ => {}

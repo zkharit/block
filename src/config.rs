@@ -4,13 +4,13 @@ use std::path::{PathBuf, Path};
 use serde::{Serialize, Deserialize};
 
 use crate::constants::DEFAULT_CONFIG_OPTIONS_STRING;
-
 use crate::util::{create_file_new, open_file_read, read_file_from_beginning};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     wallet: WalletConfig,
     validator: ValidatorConfig,
+    network: NetworkConfig
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -26,7 +26,15 @@ pub struct WalletConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ValidatorConfig {
     // if a conbase transaction cannot be created should the validator still propose the block
-    propose_without_coinbase: bool
+    propose_without_coinbase: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NetworkConfig {
+    // whether or not the user wants to conncet to a network or start their own local blockchain
+    local_blockchain: bool,
+    // initial peer list
+    peer_list: Vec<String>
 }
 
 impl Config {
@@ -81,6 +89,10 @@ impl Config {
     pub fn get_validator_config(&self) -> ValidatorConfig {
         self.validator.clone()
     }
+
+    pub fn get_network_config(&self) -> NetworkConfig {
+        self.network.clone()
+    }
     
 }
 
@@ -101,5 +113,15 @@ impl WalletConfig {
 impl ValidatorConfig {
     pub fn get_propose_without_coinbase(&self) -> bool {
         self.propose_without_coinbase
+    }
+}
+
+impl NetworkConfig {
+    pub fn get_local_blockchain(&self) -> bool {
+        self.local_blockchain
+    }
+
+    pub fn get_peer_list(&self) -> Vec<String> {
+        self.peer_list.clone()
     }
 }

@@ -8,7 +8,8 @@ use k256::PublicKey;
 use crate::account::Account;
 use crate::block::Block;
 use crate::blockchain::Blockchain;
-use crate::config::{Config, ValidatorConfig, WalletConfig};
+use crate::config::{Config, NetworkConfig, ValidatorConfig, WalletConfig};
+use crate::network::Network;
 use crate::transaction::Transaction;
 use crate::validator_account::ValidatorAccount;
 use crate::validator::Validator;
@@ -22,7 +23,7 @@ pub struct Controller {
     blockchain: Blockchain,
     wallet:  Wallet,
     validator: Validator,
-    // network: Network,
+    network: Network,
     // storage: Storage,
 }
 
@@ -62,9 +63,12 @@ impl Controller {
 
         // initialize network
         println!("Initializing network");
-        // ToDo:
+        let network = Network::new(config.get_network_config());
         println!("Initialized network");
         println!();
+
+        // ToDo: would be nice to have some sort of, local blockchain/networked blockchain, akak cant connect to the network? start your own with the initial validator being the wallet thats been generated for you
+        // could be a config option and/or fallback for not connecting to the network. Will make the genesis block creation rpocess really easy
 
         // restore blockchain from network
         println!("Restoring Blockchain");
@@ -76,7 +80,8 @@ impl Controller {
             config,
             blockchain,
             wallet,
-            validator
+            validator,
+            network
         }
     }
 
@@ -210,6 +215,10 @@ impl Controller {
 
     pub fn about_validator_config(&self) -> ValidatorConfig {
         self.config.get_validator_config()
+    }
+
+    pub fn about_network_config(&self) -> NetworkConfig {
+        self.config.get_network_config()
     }
 
     pub fn check_address_checksum(&self, address: [u8; BLOCK_ADDRESS_SIZE]) -> bool {
