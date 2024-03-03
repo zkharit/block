@@ -11,6 +11,7 @@ use crate::blockchain::Blockchain;
 use crate::config::{Config, NetworkConfig, ValidatorConfig, WalletConfig};
 use crate::network::Network;
 use crate::transaction::Transaction;
+use crate::util::read_string;
 use crate::validator_account::ValidatorAccount;
 use crate::validator::Validator;
 use crate::verification_engine;
@@ -28,7 +29,7 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new() -> Self {
+    pub fn new() -> Option<Self> {
         // get config information
         let args: Vec<String> = env::args().collect();
         let config: Config;
@@ -41,48 +42,117 @@ impl Controller {
         }
         println!();
 
-        // initialize blockchain
-        println!("Initializing blockchain with genesis block");
-        let blockchain = Blockchain::new();
-        println!("Initialized blockchain:");
-        println!("{:X?}", blockchain);
-        println!();
-
         // initialize wallet
         println!("Initializing wallet");
-        let wallet: Wallet = Wallet::new(config.get_wallet_config());
+        let mut wallet: Wallet = Wallet::new(config.get_wallet_config());
         println!("Initialized wallet");
         println!("Wallet address: {}", wallet.get_address_string());
         println!();
 
         // initialize validator
         println!("Initializing validator");
-        let validator = Validator::new(config.get_validator_config());
+        let mut validator = Validator::new(config.get_validator_config());
         println!("Initialized validator");
         println!();
 
         // initialize network
         println!("Initializing network");
-        let network = Network::new(config.get_network_config());
+        let mut network = Network::new(config.get_network_config());
         println!("Initialized network");
         println!();
 
-        // ToDo: would be nice to have some sort of, local blockchain/networked blockchain, akak cant connect to the network? start your own with the initial validator being the wallet thats been generated for you
-        // could be a config option and/or fallback for not connecting to the network. Will make the genesis block creation rpocess really easy
+        if !network.get_local_blockchain() {
+            // test connection to peers, remove them from peer list if unable to connect
+            println!("Testing connection to peers");
+            network.initial_connect();
+            println!("Finished testing connection to peers");
+            println!();
+        }
 
-        // restore blockchain from network
-        println!("Restoring Blockchain");
-        // ToDo:
-        // println!("Restored Blockchain: {:X?}", blockchain);
+        println!("Initializing blockchain");
+        let mut blockchain = Blockchain::new();
+        println!("Initialized blockchain");
         println!();
 
-        Self {
-            config,
-            blockchain,
-            wallet,
-            validator,
-            network
+        // if the config specifies to generate a local blockchain, or unable to connect to any peers
+        if network.get_local_blockchain() || network.get_peer_list_len() == 0 {
+            println!("YOU SHOULD CONFIRM YOUR WALLET NONCE IS SET TO 0 BEFORE CREATING A LOCAL BLOCKCHAIN");
+            if !network.get_local_blockchain() {
+                loop {
+                    // prompt user if they want to create their own local blockchain because they were unable to connect to any peers
+                    println!("Unable to connect to peers listed in config file, would you like to create a local blockchain instead? (yes/no)");
+                    let blockchain_input = read_string().to_lowercase();
+                    println!();
+
+                    match blockchain_input.as_str() {
+                        "yes" => break,
+                        "no" => {
+                            println!("Please check your network and/or update your peer_list in the network section of your config file");
+                            println!();
+                            return None
+                        },
+                        _ => continue
+                    }
+                }
+            }
+
+            // create a local blockchain with the generated wallet as the initial validator
+            println!("Creating local blockchain, using generated wallet as initial validator in genesis block");
+            println!();
+
+            // create initial coinbase transaction
+            let genesis_coinbase_tx = wallet.create_coinbase_tx(verification_engine::get_block_subsidy(0), wallet.get_address()).unwrap();
+            // create initial validator enable transaction
+            let genesis_validator_enable_tx = wallet.create_validator_enable_tx(0, 0).unwrap();
+            // add the initial validator enable transaction to the genesis block transaction vector
+            let mut genesis_tx_vec = vec![genesis_coinbase_tx, genesis_validator_enable_tx];
+            // get the current timestamp
+            let timestamp = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(timestamp) => timestamp.as_secs(),
+                Err(_) => return None,
+            };
+            // get the local blockchain genesis block signature
+            let genesis_sig = match wallet.create_block_sig(*BLOCK_VERSION, [0x00; 32], timestamp, &genesis_tx_vec) {
+                Some(genesis_sig) => genesis_sig,
+                None => {
+                    println!("Unable to sign local blockchain genesis block, check your wallet file");
+                    println!();
+                    return None
+                }
+            };
+            // create the local blockchain genesis block
+            let genesis_block = validator.create_block(&mut genesis_tx_vec, [0x00; 32], timestamp, genesis_sig);
+
+            // increment the wallet nonce to account for the validator enable transaction
+            wallet.increment_nonce();
+
+            // add local genesis block to blockchain
+            println!("Adding local blockchain genesis block to blockchain");
+            blockchain.add_local_genesis_block(&genesis_block);
+            println!("Added local blockchain genesis block to blockchain");
+            println!();
+        } else {
+            // initialize blockchain with typical genesis block
+            println!("Adding genesis block to blockchain");
+            blockchain.add_genesis_block();
+            println!("Added genesis block to blockchain");
+            println!();
+
+            // restore blockchain from network
+            println!("Restoring Blockchain");
+            // ToDo:
+            // println!("Restored Blockchain: {:X?}", blockchain);
+            println!();
         }
+
+        Some(
+            Self {
+                config,
+                blockchain,
+                wallet,
+                validator,
+                network
+            })
     }
 
     pub fn wallet_overview(&self) {
@@ -123,7 +193,7 @@ impl Controller {
     }
 
     pub fn blockchain_overview(&self) {
-        println!("Blockchain address: {:X?}", self.blockchain);
+        println!("{:X?}", self.blockchain);
     }
 
     pub fn blockchain_get_block_height(&self) -> u64 {
@@ -171,10 +241,17 @@ impl Controller {
             None => return false
         };
 
+        // add the transaction to the mempool
         if !self.blockchain.add_transaction_mempool(&tx) {
             return false
         }
 
+        // broadcast the transaction to the network
+        if !self.network.broadcast_transaction(&tx) {
+            return false
+        }
+
+        // increment the wallet nonce
         self.wallet.increment_nonce();
         true
     }

@@ -30,12 +30,7 @@ pub struct Blockchain {
 impl Blockchain {
     pub fn new() -> Self {
         // create genesis block
-        let mut blocks: Vec<Block> = vec![];
-        let genesis_block = Block::from(GENESIS_BLOCK.to_vec()).unwrap();
-
-        // add genesis block to chain
-        // ToDo: gensis block validation?
-        blocks.push(genesis_block.clone());
+        let blocks: Vec<Block> = vec![];
 
         // create account set
         let accounts = HashMap::new();
@@ -49,21 +44,28 @@ impl Blockchain {
         let block_height = 0;
 
         // create blockchain object
-        let mut blockchain = Blockchain {
+        Self {
             blocks,
             accounts,
             validators,
             mempool,
             block_height,
-        };
+        }
+    }
 
-        // update blockchain object with genesis block transaction
-        blockchain.update_chain(&genesis_block);
+    pub fn add_genesis_block(&mut self) {
+        self.add_local_genesis_block(&Block::from(GENESIS_BLOCK.to_vec()).unwrap());
+    }
 
-        blockchain
+    pub fn add_local_genesis_block(&mut self, genesis_block: &Block) {
+        // push the genesis block
+        self.blocks.push(genesis_block.clone());
+        // update the chain with the genesis block transactions
+        self.update_chain(&genesis_block);
     }
 
     pub fn add_block(self, block: &Block) -> (bool, Blockchain) {
+        // ToDo: look into refactoring this method, dont know if all this cloning and weird stuff should be happening
         // ToDo: can return Option<Blockchain> instead of bool tuple?
         // temporary blockchain to make changes on, will return this blockchain if block and all transactions are valid
         let mut new_blockchain = self.clone();

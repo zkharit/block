@@ -15,6 +15,7 @@ mod util;
 use std::io::{self, Write};
 
 use crate::controller::Controller;
+use crate::util::read_string;
 
 use constants::{BLOCK_ADDRESS_SIZE, LOWEST_DENOMINATION_PER_COIN, NODE_VERSION};
 
@@ -37,30 +38,22 @@ fn main() {
     
     // let secret_key = SecretKey::from_bytes(secret_key_material.into()).unwrap();
 
-    // For generating new genesis block
-    // let coinbase_tx = validator.create_coinbase_tx(0).unwrap();
-    // let validator_enable_tx = wallet.create_validator_enable_tx(0, 0).unwrap();
-    // let genesis_txs = vec![coinbase_tx, validator_enable_tx.clone()];
-
-    // let genesis_sig = wallet.create_block_sig(*BLOCK_VERSION, [0x00; 32], 0x01, &genesis_txs).unwrap();
-
-    // let genesis_block = Block::new(*BLOCK_VERSION, [0x00;32], 0x01, &genesis_txs, genesis_sig);
-
-    // println!("Genesis Block: {:X?}", genesis_block);
-
-    // println!("Serialized genesis block: {:X?}", genesis_block.serialize_block());
-
     println!("Welcome to block");
     println!("Node version: {}", NODE_VERSION);
 
     println!("Initializing node");
     println!();
-    let mut controller = Controller::new();
-    println!("Initialized node");
-    println!();
 
-    // after node has been initialized output options to the user
-    output_options(&mut controller);
+    match Controller::new() {
+        Some(mut controller) => {
+            println!("Initialized node");
+            println!();
+
+            // after node has been initialized output options to the user
+            output_options(&mut controller);
+        },
+        None => ()
+    };
 
     println!("Thanks for being apart of the block network!");
     println!("Goodbye!");
@@ -701,15 +694,4 @@ fn print_options(options: &Vec<&str>) {
         Ok(_) => (),
         Err(_) => ()
     };
-}
-
-fn read_string() -> String {
-    // helper function to read user input from the command line, removes leading and trailing spaces
-    let mut input = String::new();
-    match std::io::stdin().read_line(&mut input) {
-        Ok(_) => (),
-        Err(_) => return String::new()
-    };
-
-    input.trim().to_string()
 }

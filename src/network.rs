@@ -3,6 +3,7 @@ use std::{net::Ipv4Addr, str::FromStr};
 use serde::{Deserialize, Serialize};
 
 use crate::config::NetworkConfig;
+use crate::transaction::Transaction;
 
 pub struct Network {
     // config for the network
@@ -34,6 +35,26 @@ impl Network {
             config,
             peer_list,
         }
+    }
+
+    pub fn initial_connect(&mut self) {
+        for (index, peer) in self.peer_list.clone().iter_mut().enumerate() {
+            // ToDo: do a ping, if they cant ping then remove them from the peer list
+            // also maybe print out the removed peer
+        }
+    }
+
+    pub fn broadcast_transaction(&self, transaction: &Transaction) -> bool {
+        // ToDo: 
+        true
+    }
+
+    pub fn get_local_blockchain(&self) -> bool {
+        self.config.get_local_blockchain()
+    }
+
+    pub fn get_peer_list_len(&self) -> usize {
+        self.peer_list.len()
     }
 }
 

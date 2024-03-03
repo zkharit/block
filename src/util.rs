@@ -33,3 +33,15 @@ pub fn read_file_from_beginning(mut file: File) -> Result<String, io::Error> {
 
     Ok(string)
 }
+
+// read user input
+pub fn read_string() -> String {
+    // helper function to read user input from the command line, removes leading and trailing spaces
+    let mut input = String::new();
+    match std::io::stdin().read_line(&mut input) {
+        Ok(_) => (),
+        Err(_) => return String::new()
+    };
+
+    input.trim().to_string()
+}
