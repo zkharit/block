@@ -33,15 +33,12 @@ local_blockchain = true
 peer_list = ["127.0.0.1:28475"]
 ```
 ### wallet
-The wallet section is for configuration options related to the wallet module\
 `wallet_file` - The path to the desired wallet file. Much like the config file if it doesn't exist it will be placed in the location that is specified.\
 `compressed_public_key` - Defines if the wallet should derive its address from a compressed public key or not.\
 `wallet_file_version` - The version of the wallet_file, it is unlikely for a new wallet file version to be implemented in the future.
 ### validator
-The validator section is for configuration options related to the validator module\
 `propose_without_coinbase` - Defines if the validator module should propose blocks in the scenario where it cannot create a coinbase transaction. This will keep the winning validator from receiving the block subsidy AND any transaction fees. If the validator can create the coinbase transaction for a given block then it will include that transaction even if this settings is set to true.
 ### network
-The network section is for configuration options related to the network module\
 `local_blockchain` - Whether or not to run a local blockchain or attempt to connect to peers. If a local blockchain is chosen, the wallet that is generated will become the initial validator through a validator enable transaction that will be placed in the genesis block. The user should confirm their wallet nonce is 0 before choosing this option, if you have never generated a wallet file, then you will not need to worry about this.\
 `peer_list` - A list of peers to attempt to connect to. This field is an array of ipv4:port strings. Invalid entries or peers the node cannot connect to will not be inlcuded in the peer list upon node initialization.
 
