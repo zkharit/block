@@ -41,6 +41,7 @@ impl Blockchain {
         // create mempool hashmap
         let mempool: HashMap<[u8; COMPRESSED_PUBLIC_KEY_SIZE], Vec<Transaction>> = HashMap::new();
 
+        // initialize block height at 0
         let block_height = 0;
 
         // create blockchain object

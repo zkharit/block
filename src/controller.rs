@@ -67,8 +67,15 @@ impl Controller {
             network.initial_connect();
             println!("Finished testing connection to peers");
             println!();
+
+            // print any successfully connected peers
+            if network.get_peer_list_len() != 0 {
+                println!("Successfully connected to: {:?}", network.get_peer_list());
+                println!();
+            }
         }
 
+        // initialize blockchain
         println!("Initializing blockchain");
         let mut blockchain = Blockchain::new();
         println!("Initialized blockchain");
@@ -481,5 +488,19 @@ impl Controller {
         };
         
         Some(self.validator.create_block(&mut tx_vec, prev_hash, timestamp, block_sig))
+    }
+
+    pub fn do_block_things(&mut self) {
+        let block = self.validator_create_block().unwrap();
+
+        let (result, blockchain) = self.blockchain.clone().add_block(&block);
+        
+        if result {
+            self.blockchain = blockchain
+        } else {
+            println!("Failed to add block to blockchain");
+            println!("Blokc: {:?}", block);
+            // println!("Blockchain: {:?}", blockchain);
+        }
     }
 }

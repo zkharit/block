@@ -20,6 +20,8 @@ use crate::util::read_string;
 use constants::{BLOCK_ADDRESS_SIZE, LOWEST_DENOMINATION_PER_COIN, NODE_VERSION};
 
 fn main() {
+    // ToDo: pre-requisies: protobuf "sudo apt-install protobuf-compiler libprotobuf-dev"
+    // ToDo: look into cargo bin
     // Test Vectors:
     // Test secret key found on: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address
     // let secret_key_material: &[u8] = &[24, 225, 74, 123, 106, 48, 127, 66, 106, 148, 248, 17, 71, 1, 231, 200, 231, 116, 231, 249, 164, 126, 44, 32, 53, 219, 41, 162, 6, 50, 23, 37];
@@ -60,7 +62,7 @@ fn main() {
 }
 
 fn output_options(controller: &mut Controller) {
-    let primary_options = vec!["Options:", "Wallet", "Blockchain", "Transaction", "About", "Exit"];
+    let primary_options = vec!["Options:", "Wallet", "Blockchain", "Transaction", "Network", "About", "Exit"];
 
     loop {
         // present high level options to user
@@ -80,10 +82,13 @@ fn output_options(controller: &mut Controller) {
             "3" | "3." | "transaction" => {
                 perform_transaction_options(controller);
             },
-            "4" | "4." | "about" => {
+            "4" | "4." | "network" => {
+                perform_network_options(controller);
+            },
+            "5" | "5." | "about" => {
                 perform_about_options(controller);
             },
-            "5" | "5." | "exit" => {
+            "6" | "6." | "exit" => {
                 println!("Are you sure you want to exit, you will stop receiving blocks and transactions from other nodes in the network and you will need to re-sync your blockchain next time you start your node? (yes/no)");
                 let final_input = read_string().to_lowercase();
                 println!();
@@ -635,6 +640,10 @@ fn perform_transaction_options(controller: &mut Controller) {
             _ => {}
         }
     }
+}
+
+fn perform_network_options(controller: &Controller) {
+    
 }
 
 fn perform_about_options(controller: &Controller) {
