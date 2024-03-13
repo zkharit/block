@@ -119,6 +119,23 @@ impl Blockchain {
         true
     }
 
+    pub fn remove_transaction_mempool(&mut self, transaction: &Transaction) {
+        match self.mempool.get_mut(&transaction.sender) {
+            Some(transaction_vec) => {
+                // remove the matched transaction
+                transaction_vec.retain(|tx| {
+                    tx != transaction
+                });
+
+                // if the transaction sender has no more transactions in the mempool then remove their entry from the mempool hashmap
+                if transaction_vec.len() == 0 {
+                    self.mempool.remove(&transaction.sender);
+                }
+            },
+            None => ()
+        }
+    }
+
     fn update_chain(&mut self, block: &Block) -> bool {
         // this function assumes that the blocks given to it are valid with the current chain state
         // this function should only ever be called after the verification engine has verified all transactions within the given block with the current chain state

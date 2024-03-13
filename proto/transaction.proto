@@ -1,0 +1,20 @@
+syntax = "proto3";
+package transaction;
+
+service Transaction {
+  rpc SendTransaction (SendTransactionRequest) returns (SendTransactionReply);
+}
+
+message SendTransactionRequest {
+  uint32 version = 1;
+  uint64 amount = 2;
+  uint64 fee = 3;
+  bytes recipient = 4;
+  bytes sender = 5;
+  bytes signature = 6;
+  uint64 nonce = 7;
+}
+
+message SendTransactionReply {
+  bool ok = 1;
+}

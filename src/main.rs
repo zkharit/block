@@ -19,7 +19,9 @@ use crate::util::read_string;
 
 use constants::{BLOCK_ADDRESS_SIZE, LOWEST_DENOMINATION_PER_COIN, NODE_VERSION};
 
-fn main() {
+// ToDo: refactor where async-ness should happen
+#[tokio::main]
+async fn main() {
     // ToDo: pre-requisies: protobuf "sudo apt-install protobuf-compiler libprotobuf-dev"
     // ToDo: look into cargo bin
     // Test Vectors:
@@ -46,13 +48,15 @@ fn main() {
     println!("Initializing node");
     println!();
 
-    match Controller::new() {
+    // ToDo: need to remove some of the "Starter" code from controller::new()
+
+    match Controller::new().await {
         Some(mut controller) => {
             println!("Initialized node");
             println!();
 
             // after node has been initialized output options to the user
-            output_options(&mut controller);
+            output_options(&mut controller).await;
         },
         None => ()
     };
@@ -61,7 +65,7 @@ fn main() {
     println!("Goodbye!");
 }
 
-fn output_options(controller: &mut Controller) {
+async fn output_options(controller: &mut Controller) {
     let primary_options = vec!["Options:", "Wallet", "Blockchain", "Transaction", "Network", "About", "Exit"];
 
     loop {
@@ -80,7 +84,7 @@ fn output_options(controller: &mut Controller) {
                 perform_blockhain_options(controller);
             },
             "3" | "3." | "transaction" => {
-                perform_transaction_options(controller);
+                perform_transaction_options(controller).await;
             },
             "4" | "4." | "network" => {
                 perform_network_options(controller);
@@ -323,7 +327,7 @@ fn perform_blockhain_options(controller: &mut Controller) {
     }
 }
 
-fn perform_transaction_options(controller: &mut Controller) {
+async fn perform_transaction_options(controller: &mut Controller) {
     let transaction_options = vec!["Transaction Options:", "A -> B", "Validator enable", "Validator revoke", "Back"];
 
     loop {
@@ -394,7 +398,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                         let amount_string_parts = amount_string.split('.').collect::<Vec<&str>>();
                         if amount_string_parts.len() == 2 {
                             if amount_string_parts[1].len() > 8 {
-                                println!("Please enter an amount of block with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                println!("Please enter an amount of block with a maximum of 8 decimal places (0.00000001 = 1 bit)");
                                 println!();
                                 continue;
                             }
@@ -435,7 +439,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                             let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                             if fee_string_parts.len() == 2 {
                                 if fee_string_parts[1].len() > 8 {
-                                    println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                    println!("Please enter a fee with a maximum of 8 decimal places (0.00000001 = 1 bit)");
                                     println!();
                                     continue;
                                 }
@@ -448,12 +452,52 @@ fn perform_transaction_options(controller: &mut Controller) {
                                 continue;
                             }
 
-                            // create and broadcast the transaction
-                            if controller.transaction_create_a_b(address_arr, (amount * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64, (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
-                                println!("Successfully broadcast transaction");
+                            // create the transaction
+                            let transaction = match controller.transaction_create_a_b(address_arr, (amount * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64, (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
+                                Some(transaction) => transaction,
+                                None => {
+                                    println!("Failed creating transaction, check wallet file location/permissions");
+                                    println!();
+                                    break
+                                }
+                            };
+
+                            // try adding transaction to mempool
+                            if !controller.blockchain_add_transaction_mempool(&transaction) {
+                                println!("Failed adding to transaction to mempool, transaction may be invalid");
                                 println!();
+                                break
+                            }
+
+                            // if successful check if local blockchain or not
+                            if !controller.network_get_local_blockchain() {
+                                // broadcast transaction to peers
+                                let successful_broadcasted_peers = match controller.network_broadcast_transaction(&transaction).await {
+                                    Some(successful_broadcasted_peers) => successful_broadcasted_peers,
+                                    None => {
+                                        // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                                        controller.blockchain_remove_transaction_mempool(&transaction);
+                                        println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                                        println!();
+                                        break
+                                    }
+                                };
+
+                                if successful_broadcasted_peers.len() > 0 {
+                                    // increment wallet nonce
+                                    controller.wallet_increment_nonce();
+                                    println!("Successfully added transaction to mempool and broadcasted transaction to: {:?}", successful_broadcasted_peers);
+                                    println!();
+                                } else {
+                                    // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                                    controller.blockchain_remove_transaction_mempool(&transaction);
+                                    println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                                    println!();
+                                }
                             } else {
-                                println!("Failed broadcasting transaction");
+                                // increment wallet nonce
+                                controller.wallet_increment_nonce();
+                                println!("Successfully added transaction to mempool");
                                 println!();
                             }
                             break;
@@ -494,7 +538,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                     let amount_string_parts = amount_string.split('.').collect::<Vec<&str>>();
                     if amount_string_parts.len() == 2 {
                         if amount_string_parts[1].len() > 8 {
-                            println!("Please enter an amount of BLO with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                            println!("Please enter an amount of BLO with a maximum of 8 decimal places (0.00000001 = 1 bit)");
                             println!();
                             continue;
                         }
@@ -535,7 +579,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                         let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                         if fee_string_parts.len() == 2 {
                             if fee_string_parts[1].len() > 8 {
-                                println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                                println!("Please enter a fee with a maximum of 8 decimal places (0.00000001 = 1 bit)");
                                 println!();
                                 continue;
                             }
@@ -548,12 +592,52 @@ fn perform_transaction_options(controller: &mut Controller) {
                             continue;
                         }
 
-                        // create and broadcast the transaction
-                        if controller.transaction_create_validator_enable((amount * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64, (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
-                            println!("Successfully broadcast transaction");
+                        // create the transaction
+                        let transaction = match controller.transaction_create_validator_enable((amount * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64, (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
+                            Some(transaction) => transaction,
+                            None => {
+                                println!("Failed creating transaction, check wallet file location/permissions");
+                                println!();
+                                break
+                            }
+                        };
+
+                        // try adding transaction to mempool
+                        if !controller.blockchain_add_transaction_mempool(&transaction) {
+                            println!("Failed adding to transaction to mempool, transaction may be invalid");
                             println!();
+                            break
+                        }
+
+                        // if successful check if local blockchain or not
+                        if !controller.network_get_local_blockchain() {
+                            // broadcast transaction to peers
+                            let successful_broadcasted_peers = match controller.network_broadcast_transaction(&transaction).await {
+                                Some(successful_broadcasted_peers) => successful_broadcasted_peers,
+                                None => {
+                                    // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                                    controller.blockchain_remove_transaction_mempool(&transaction);
+                                    println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                                    println!();
+                                    break
+                                }
+                            };
+
+                            if successful_broadcasted_peers.len() > 0 {
+                                // increment wallet nonce
+                                controller.wallet_increment_nonce();
+                                println!("Successfully added transaction to mempool and broadcasted transaction to: {:?}", successful_broadcasted_peers);
+                                println!();
+                            } else {
+                                // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                                controller.blockchain_remove_transaction_mempool(&transaction);
+                                println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                                println!();
+                            }
                         } else {
-                            println!("Failed broadcasting transaction");
+                            // increment wallet nonce
+                            controller.wallet_increment_nonce();
+                            println!("Successfully added transaction to mempool");
                             println!();
                         }
                         break;
@@ -610,7 +694,7 @@ fn perform_transaction_options(controller: &mut Controller) {
                     let fee_string_parts = fee_string.split('.').collect::<Vec<&str>>();
                     if fee_string_parts.len() == 2 {
                         if fee_string_parts[1].len() > 8 {
-                            println!("Please enter a fee with a maximum of 8 decmal places (0.00000001 = 1 bit)");
+                            println!("Please enter a fee with a maximum of 8 decimal places (0.00000001 = 1 bit)");
                             println!();
                             continue;
                         }
@@ -622,13 +706,53 @@ fn perform_transaction_options(controller: &mut Controller) {
                         println!();
                         continue;
                     }
+                    
+                    // create the transaction
+                    let transaction = match controller.transaction_create_validator_revoke(account.get_stake(), (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
+                        Some(transaction) => transaction,
+                        None => {
+                            println!("Failed creating transaction, check wallet file location/permissions");
+                            println!();
+                            break
+                        }
+                    };
 
-                    // create and broadcast the transaction
-                    if controller.transaction_create_validator_revoke(account.get_stake(), (fee * *LOWEST_DENOMINATION_PER_COIN).ceil() as u64) {
-                        println!("Successfully broadcast transaction");
+                    // try adding transaction to mempool
+                    if !controller.blockchain_add_transaction_mempool(&transaction) {
+                        println!("Failed adding to transaction to mempool, transaction may be invalid");
                         println!();
+                        break
+                    }
+
+                    // if successful check if local blockchain or not
+                    if !controller.network_get_local_blockchain() {
+                        // broadcast transaction to peers
+                        let successful_broadcasted_peers = match controller.network_broadcast_transaction(&transaction).await {
+                            Some(successful_broadcasted_peers) => successful_broadcasted_peers,
+                            None => {
+                                // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                                controller.blockchain_remove_transaction_mempool(&transaction);
+                                println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                                println!();
+                                break
+                            }
+                        };
+
+                        if successful_broadcasted_peers.len() > 0 {
+                            // increment wallet nonce
+                            controller.wallet_increment_nonce();
+                            println!("Successfully added transaction to mempool and broadcasted transaction to: {:?}", successful_broadcasted_peers);
+                            println!();
+                        } else {
+                            // if unable to broadcast transaction remove transaction from local mempool to keep in sync with the network
+                            controller.blockchain_remove_transaction_mempool(&transaction);
+                            println!("Unsuccessful broadcasting transaction to peers, please check your connection to your peers and try again");
+                            println!();
+                        }
                     } else {
-                        println!("Failed broadcasting transaction");
+                        // increment wallet nonce
+                        controller.wallet_increment_nonce();
+                        println!("Successfully added transaction to mempool");
                         println!();
                     }
                     break;

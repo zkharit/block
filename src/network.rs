@@ -11,8 +11,15 @@ use crate::transaction::Transaction;
 use ping::ping_client::PingClient;
 use ping::PingRequest;
 
+use transaction::transaction_client::TransactionClient;
+use transaction::SendTransactionRequest;
+
 pub mod ping {
     tonic::include_proto!("ping");
+}
+
+pub mod transaction {
+    tonic::include_proto!("transaction");
 }
 
 pub struct Network {
@@ -48,7 +55,6 @@ impl Network {
         }
     }
 
-    #[tokio::main]
     pub async fn initial_connect(&mut self) {
         // ping each peer in the peer list and mark them as invalid if unable to connect, or received an invalid ping response
         for peer in self.peer_list.iter_mut() {
@@ -75,6 +81,8 @@ impl Network {
                 }
             };
 
+            // ToDo: need an api version vs node version
+
             // parse ping response
 
             // semantic version regex obtained from: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
@@ -100,17 +108,97 @@ impl Network {
         });
     }
 
-    pub fn broadcast_transaction(&self, transaction: &Transaction) -> bool {
-        // ToDo: 
-        let serialized_transaction = transaction.serialize_tx();
-        true
+    pub async fn broadcast_transaction(&mut self, transaction: &Transaction) -> Option<Vec<Peer>> {
+        let mut successful_broadcasts = vec![];
+
+        // only attempt to broadcast transactions if not running a local blockchain
+        if !self.get_local_blockchain() {
+            for peer in self.peer_list.iter_mut() { 
+                // attempt to establish connection with the peer
+                let mut client = match TransactionClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
+                    Ok(client) => client,
+                    Err(_) => {
+                        println!("Unable to connect to peer: {}:{} ", peer.ip, peer.port);
+                        continue
+                    }
+                };
+
+                // create the request
+                let request = tonic::Request::new(SendTransactionRequest {
+                    version: transaction.version.into(),
+                    amount: transaction.amount,
+                    fee: transaction.fee,
+                    recipient: transaction.recipient.to_vec(),
+                    sender: transaction.sender.to_vec(),
+                    signature: transaction.signature.to_vec(),
+                    nonce: transaction.nonce
+                });
+
+                // make the request to the peer and get a response
+                let response = match client.send_transaction(request).await {
+                    Ok(response) => response.into_inner(),
+                    Err(_) => {
+                        println!("Unable to broadcast transaction to peer: {}:{}", peer.ip, peer.port);
+                        continue
+                    }
+                };
+
+                // parse transaction broadcast response
+                if !response.ok {
+                    println!("Broadcast transaction rejection from peer: {}:{}", peer.ip, peer.port);
+                    continue
+                } 
+
+                successful_broadcasts.push(peer.to_owned());
+            }
+        }
+
+        Some(successful_broadcasts)
     }
 
-    pub fn broadcast_block(&self, block: &Block) -> bool {
-        // ToDo: 
-        let serialized_block = block.serialize_block();
-        true
-    }
+    // pub fn broadcast_block(&self, block: &Block) -> Option<Vec<Peer>> {
+    //     let mut successful_broadcasts = vec![];
+
+    //     // only attempt to broadcast transactions if not running a local blockchain
+    //     if !self.get_local_blockchain() {
+    //         for peer in self.peer_list.iter_mut() { 
+    //             // attempt to establish connection with the peer
+    //             let mut client = match BlockClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
+    //                 Ok(client) => client,
+    //                 Err(_) => {
+    //                     println!("Unable to connect to peer: {}:{} ", peer.ip, peer.port);
+    //                     continue
+    //                 }
+    //             };
+
+    //             // create the request
+    //             let request = tonic::Request::new(SendBlockRequest {
+    //                 version: transaction.version.into(),
+    //                 amount: transaction.amount,
+    //                 fee: transaction.fee,
+    //                 recipient: transaction.recipient.to_vec(),
+    //                 sender: transaction.sender.to_vec(),
+    //                 signature: transaction.signature.to_vec(),
+    //                 nonce: transaction.nonce
+    //             });
+
+    //             // make the request to the peer and get a response
+    //             let response = match client.block(request).await {
+    //                 Ok(response) => response.into_inner(),
+    //                 Err(_) => {
+    //                     println!("Unable to broadcast transaction to peer: {}:{}", peer.ip, peer.port);
+    //                     continue
+    //                 }
+    //             };
+
+    //             // ToDo: parse response reveied from peers
+
+    //             successful_broadcasts.push(peer.to_owned());
+    //         }
+    //     }
+
+    //     Some(successful_broadcasts)
+    // }
 
     pub fn get_local_blockchain(&self) -> bool {
         self.config.get_local_blockchain()

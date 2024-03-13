@@ -9,7 +9,7 @@ use crate::account::Account;
 use crate::block::Block;
 use crate::blockchain::Blockchain;
 use crate::config::{Config, NetworkConfig, ValidatorConfig, WalletConfig};
-use crate::network::Network;
+use crate::network::{Network, Peer};
 use crate::transaction::Transaction;
 use crate::util::read_string;
 use crate::validator_account::ValidatorAccount;
@@ -29,7 +29,7 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new() -> Option<Self> {
+    pub async fn new() -> Option<Self> {
         // get config information
         let args: Vec<String> = env::args().collect();
         let config: Config;
@@ -64,7 +64,7 @@ impl Controller {
         if !network.get_local_blockchain() {
             // test connection to peers, remove them from peer list if unable to connect
             println!("Testing connection to peers");
-            network.initial_connect();
+            network.initial_connect().await;
             println!("Finished testing connection to peers");
             println!();
 
@@ -199,6 +199,10 @@ impl Controller {
         self.wallet.set_nonce(nonce);
     }
 
+    pub fn wallet_increment_nonce(&mut self) {
+        self.wallet.increment_nonce();
+    }
+
     pub fn blockchain_overview(&self) {
         println!("{:X?}", self.blockchain);
     }
@@ -241,56 +245,32 @@ impl Controller {
         self.blockchain.clear_mempool()
     }
 
-    pub fn transaction_create_a_b(&mut self, recipient: [u8; BLOCK_ADDRESS_SIZE], amount: u64, fee: u64) -> bool {
-        // ToDo: need to broadcast transaction to network
-        let tx = match self.wallet.create_tx(amount, fee, recipient) {
-            Some(tx) => tx,
-            None => return false
-        };
-
-        // add the transaction to the mempool
-        if !self.blockchain.add_transaction_mempool(&tx) {
-            return false
-        }
-
-        // broadcast the transaction to the network
-        if !self.network.broadcast_transaction(&tx) {
-            return false
-        }
-
-        // increment the wallet nonce
-        self.wallet.increment_nonce();
-        true
+    pub fn blockchain_add_transaction_mempool(&mut self, transaction: &Transaction) -> bool {
+        self.blockchain.add_transaction_mempool(transaction)
     }
 
-    pub fn transaction_create_validator_enable(&mut self, amount: u64, fee: u64) -> bool {
-        let tx = match self.wallet.create_validator_enable_tx(amount, fee) {
-            Some(tx) => tx,
-            None => return false
-        };
-
-
-        if !self.blockchain.add_transaction_mempool(&tx) {
-            return false
-        }
-
-        self.wallet.increment_nonce();
-        true
+    pub fn blockchain_remove_transaction_mempool(&mut self, transaction: &Transaction) {
+        self.blockchain.remove_transaction_mempool(transaction)
     }
 
-    pub fn transaction_create_validator_revoke(&mut self, amount: u64, fee: u64) -> bool {
-        let tx = match self.wallet.create_validator_revoke_tx(amount, fee) {
-            Some(tx) => tx,
-            None => return false
-        };
+    pub fn transaction_create_a_b(&mut self, recipient: [u8; BLOCK_ADDRESS_SIZE], amount: u64, fee: u64) -> Option<Transaction> {
+        self.wallet.create_tx(amount, fee, recipient)
+    }
 
+    pub fn transaction_create_validator_enable(&mut self, amount: u64, fee: u64) -> Option<Transaction> {
+        self.wallet.create_validator_enable_tx(amount, fee)
+    }
 
-        if !self.blockchain.add_transaction_mempool(&tx) {
-            return false
-        }
+    pub fn transaction_create_validator_revoke(&mut self, amount: u64, fee: u64) -> Option<Transaction> {
+        self.wallet.create_validator_revoke_tx(amount, fee)
+    }
 
-        self.wallet.increment_nonce();
-        true
+    pub fn network_get_local_blockchain(&self) -> bool {
+        self.network.get_local_blockchain()
+    }
+
+    pub async fn network_broadcast_transaction(&mut self, transaction: &Transaction) -> Option<Vec<Peer>> {
+        self.network.broadcast_transaction(&transaction).await
     }
 
     pub fn about_wallet_config(&self) -> WalletConfig {
@@ -349,7 +329,7 @@ impl Controller {
                 match max_transaction_fee {
                     // if there already is a max_transaction_fee compare the current transaction's fee to the max transaction fee
                     Some(max_fee) => {
-                        // if the current transaction's fee is higher than the max trnasaction fee then confirm the nonce is correct for this transaction
+                        // if the current transaction's fee is higher than the max transaction fee then confirm the nonce is correct for this transaction
                         if transactions[0].fee > max_fee {
                             // get the account public key
                             let account_pub_key = match PublicKey::from_sec1_bytes(&sender) {
