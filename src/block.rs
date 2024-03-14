@@ -106,6 +106,14 @@ impl Block {
     pub fn get_signature(&self) -> Signature {
         self.signature
     }
+
+    pub fn get_block_size(&self) -> u32 {
+        self.block_size
+    }
+
+    pub fn get_version(&self) -> u32 {
+        self.block_header.version
+    }
 }
 
 impl BlockHeader {

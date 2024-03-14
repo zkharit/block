@@ -1,15 +1,15 @@
 syntax = "proto3";
-package ping;
+package block.ping;
 
-service Ping {
-  rpc Ping (PingRequest) returns (PingReply);
+service PingService {
+  rpc BroadcastPing (BroadcastPingRequest) returns (BroadcastPingReply);
 }
 
-message PingRequest {
+message BroadcastPingRequest {
   string version = 1;
 }
 
-message PingReply {
+message BroadcastPingReply {
   bool ready = 1;
   string version = 2;
   uint64 block_height = 3;

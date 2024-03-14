@@ -1,5 +1,5 @@
 syntax = "proto3";
-package transaction;
+package block.transaction;
 
 service TransactionService {
   rpc BroadcastTransaction (BroadcastTransactionRequest) returns (BroadcastTransactionReply);

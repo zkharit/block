@@ -1,0 +1,40 @@
+syntax = "proto3";
+package block.block;
+
+service BlockService {
+  rpc BroadcastBlock (BroadcastBlockRequest) returns (BroadcastBlockReply);
+}
+
+message Block {
+  uint32 block_size = 1;
+  BlockHeader block_header = 2;
+  repeated Transaction transactions = 3;
+  bytes signature = 4;
+}
+
+message BlockHeader {
+  uint32 version = 1;
+  bytes prev_hash = 2;
+  bytes merkle_root = 3;
+  uint64 timestamp = 4;
+}
+
+// ToDo: import Transaction definition from transaction.proto was giving issues, use this definition and move on, only will need to be changed with block protocol changes, possibly (or not) a bug in prost crate
+
+message Transaction {
+  uint32 version = 1;
+  uint64 amount = 2;
+  uint64 fee = 3;
+  bytes recipient = 4;
+  bytes sender = 5;
+  bytes signature = 6;
+  uint64 nonce = 7;
+}
+
+message BroadcastBlockRequest {
+ Block block = 1;
+}
+
+message BroadcastBlockReply {
+  bool ok = 1;
+}

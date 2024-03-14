@@ -8,18 +8,25 @@ use crate::config::NetworkConfig;
 use crate::constants::NODE_VERSION;
 use crate::transaction::Transaction;
 
-use ping::ping_client::PingClient;
-use ping::PingRequest;
+use protoping::ping_service_client::PingServiceClient;
+use protoping::BroadcastPingRequest;
 
 use prototransaction::transaction_service_client::TransactionServiceClient;
 use prototransaction::BroadcastTransactionRequest;
 
-pub mod ping {
-    tonic::include_proto!("ping");
+use protoblock::block_service_client::BlockServiceClient;
+use protoblock::BroadcastBlockRequest;
+
+pub mod protoping {
+    tonic::include_proto!("block.ping");
 }
 
 pub mod prototransaction {
-    tonic::include_proto!("transaction");
+    tonic::include_proto!("block.transaction");
+}
+
+pub mod protoblock {
+    tonic::include_proto!("block.block");
 }
 
 pub struct Network {
@@ -59,7 +66,7 @@ impl Network {
         // ping each peer in the peer list and mark them as invalid if unable to connect, or received an invalid ping response
         for peer in self.peer_list.iter_mut() {
             // attempt to establish connection with the peer
-            let mut client = match PingClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
+            let mut client = match PingServiceClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
                 Ok(client) => client,
                 Err(_) => {
                     println!("Unable to connect to peer: {}:{} during initial connect, removing from peer list. This will not remove this peer from your config file.", peer.ip, peer.port);
@@ -68,12 +75,12 @@ impl Network {
             };
 
             // create the request
-            let request = tonic::Request::new(PingRequest {
+            let request = tonic::Request::new(BroadcastPingRequest {
                 version: String::from(NODE_VERSION),
             });
             
             // make the request to the peer and get a response
-            let response = match client.ping(request).await {
+            let response = match client.broadcast_ping(request).await {
                 Ok(response) => response.into_inner(),
                 Err(_) => {
                     println!("Unable to ping peer: {}:{} during initial connect, removing from peer list. This will not remove this peer from your config file.", peer.ip, peer.port);
@@ -158,49 +165,65 @@ impl Network {
         Some(successful_broadcasts)
     }
 
-    // pub fn broadcast_block(&self, block: &Block) -> Option<Vec<Peer>> {
-    //     let mut successful_broadcasts = vec![];
+    pub async fn broadcast_block(&mut self, block: &Block) -> Option<Vec<Peer>> {
+        let mut successful_broadcasts = vec![];
 
-    //     // only attempt to broadcast transactions if not running a local blockchain
-    //     if !self.get_local_blockchain() {
-    //         for peer in self.peer_list.iter_mut() { 
-    //             // attempt to establish connection with the peer
-    //             let mut client = match BlockClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
-    //                 Ok(client) => client,
-    //                 Err(_) => {
-    //                     println!("Unable to connect to peer: {}:{} ", peer.ip, peer.port);
-    //                     continue
-    //                 }
-    //             };
+        // only attempt to broadcast transactions if not running a local blockchain
+        if !self.get_local_blockchain() {
+            for peer in self.peer_list.iter_mut() { 
+                // attempt to establish connection with the peer
+                let mut client = match BlockServiceClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
+                    Ok(client) => client,
+                    Err(_) => {
+                        println!("Unable to connect to peer: {}:{} ", peer.ip, peer.port);
+                        continue
+                    }
+                };
 
-    //             // create the request
-    //             let request = tonic::Request::new(SendBlockRequest {
-    //                 version: transaction.version.into(),
-    //                 amount: transaction.amount,
-    //                 fee: transaction.fee,
-    //                 recipient: transaction.recipient.to_vec(),
-    //                 sender: transaction.sender.to_vec(),
-    //                 signature: transaction.signature.to_vec(),
-    //                 nonce: transaction.nonce
-    //             });
+                // create the request
+                let request = tonic::Request::new(BroadcastBlockRequest {
+                    block: Some(protoblock::Block {
+                        block_size: block.get_block_size(),
+                        block_header: Some(protoblock::BlockHeader {
+                            version: block.get_version(),
+                            prev_hash: block.prev_hash().to_vec(),
+                            merkle_root: block.merkle_root().to_vec(),
+                            timestamp: block.get_timesamp(),
+                        }),
+                        transactions: block.get_transactions().iter().map(|transaction| protoblock::Transaction {
+                            version: transaction.version.into(),
+                            amount: transaction.amount,
+                            fee: transaction.fee,
+                            recipient: transaction.recipient.to_vec(),
+                            sender: transaction.sender.to_vec(),
+                            signature: transaction.signature.to_vec(),
+                            nonce: transaction.nonce,
+                        }).collect(),
+                        signature: block.get_signature().to_vec(),
+                    })
+                });
 
-    //             // make the request to the peer and get a response
-    //             let response = match client.block(request).await {
-    //                 Ok(response) => response.into_inner(),
-    //                 Err(_) => {
-    //                     println!("Unable to broadcast transaction to peer: {}:{}", peer.ip, peer.port);
-    //                     continue
-    //                 }
-    //             };
+                // make the request to the peer and get a response
+                let response = match client.broadcast_block(request).await {
+                    Ok(response) => response.into_inner(),
+                    Err(_) => {
+                        println!("Unable to broadcast block to peer: {}:{}", peer.ip, peer.port);
+                        continue
+                    }
+                };
 
-    //             // ToDo: parse response reveied from peers
+                // parse transaction broadcast response
+                if !response.ok {
+                    println!("Broadcast block rejection from peer: {}:{}", peer.ip, peer.port);
+                    continue
+                } 
 
-    //             successful_broadcasts.push(peer.to_owned());
-    //         }
-    //     }
+                successful_broadcasts.push(peer.to_owned());
+            }
+        }
 
-    //     Some(successful_broadcasts)
-    // }
+        Some(successful_broadcasts)
+    }
 
     pub fn get_local_blockchain(&self) -> bool {
         self.config.get_local_blockchain()
