@@ -11,14 +11,14 @@ use crate::transaction::Transaction;
 use ping::ping_client::PingClient;
 use ping::PingRequest;
 
-use transaction::transaction_client::TransactionClient;
-use transaction::SendTransactionRequest;
+use prototransaction::transaction_service_client::TransactionServiceClient;
+use prototransaction::BroadcastTransactionRequest;
 
 pub mod ping {
     tonic::include_proto!("ping");
 }
 
-pub mod transaction {
+pub mod prototransaction {
     tonic::include_proto!("transaction");
 }
 
@@ -115,7 +115,7 @@ impl Network {
         if !self.get_local_blockchain() {
             for peer in self.peer_list.iter_mut() { 
                 // attempt to establish connection with the peer
-                let mut client = match TransactionClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
+                let mut client = match TransactionServiceClient::connect(format!("http://{}:{}", peer.ip, peer.port)).await {
                     Ok(client) => client,
                     Err(_) => {
                         println!("Unable to connect to peer: {}:{} ", peer.ip, peer.port);
@@ -124,18 +124,20 @@ impl Network {
                 };
 
                 // create the request
-                let request = tonic::Request::new(SendTransactionRequest {
-                    version: transaction.version.into(),
-                    amount: transaction.amount,
-                    fee: transaction.fee,
-                    recipient: transaction.recipient.to_vec(),
-                    sender: transaction.sender.to_vec(),
-                    signature: transaction.signature.to_vec(),
-                    nonce: transaction.nonce
+                let request = tonic::Request::new(BroadcastTransactionRequest {
+                    transaction: Some(prototransaction::Transaction {
+                        version: transaction.version.into(),
+                        amount: transaction.amount,
+                        fee: transaction.fee,
+                        recipient: transaction.recipient.to_vec(),
+                        sender: transaction.sender.to_vec(),
+                        signature: transaction.signature.to_vec(),
+                        nonce: transaction.nonce,
+                    })
                 });
 
                 // make the request to the peer and get a response
-                let response = match client.send_transaction(request).await {
+                let response = match client.broadcast_transaction(request).await {
                     Ok(response) => response.into_inner(),
                     Err(_) => {
                         println!("Unable to broadcast transaction to peer: {}:{}", peer.ip, peer.port);

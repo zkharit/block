@@ -1,11 +1,11 @@
 syntax = "proto3";
 package transaction;
 
-service Transaction {
-  rpc SendTransaction (SendTransactionRequest) returns (SendTransactionReply);
+service TransactionService {
+  rpc BroadcastTransaction (BroadcastTransactionRequest) returns (BroadcastTransactionReply);
 }
 
-message SendTransactionRequest {
+message Transaction {
   uint32 version = 1;
   uint64 amount = 2;
   uint64 fee = 3;
@@ -15,6 +15,10 @@ message SendTransactionRequest {
   uint64 nonce = 7;
 }
 
-message SendTransactionReply {
+message BroadcastTransactionRequest {
+  Transaction transaction = 1;
+}
+
+message BroadcastTransactionReply {
   bool ok = 1;
 }
