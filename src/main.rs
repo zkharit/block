@@ -23,6 +23,7 @@ use constants::{BLOCK_ADDRESS_SIZE, LOWEST_DENOMINATION_PER_COIN, NODE_VERSION};
 #[tokio::main]
 async fn main() {
     // ToDo: pre-requisies: protobuf "sudo apt-install protobuf-compiler libprotobuf-dev"
+    // ToDo: pre-requisites: rustc >= 1.73
     // ToDo: look into cargo bin
     // Test Vectors:
     // Test secret key found on: https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address

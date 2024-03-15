@@ -11,7 +11,7 @@ use crate::transaction::Transaction;
 // This duplicates the transaction count in the serialized structure. Probably should have a customized serialization function, so its not just implicity there
 // but thats extra work thats probably not needed at this time
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Block {
     block_size: u32,
     block_header: BlockHeader,
@@ -20,7 +20,7 @@ pub struct Block {
     signature: Signature,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct BlockHeader {
     version: u32,
     prev_hash: [u8; 32],
@@ -89,6 +89,15 @@ impl Block {
             .with_fixint_encoding()
             .with_big_endian()
             .deserialize(&raw)
+    }
+
+    pub fn from_parts(block_size: u32, block_header: BlockHeader, transactions: Vec<Transaction>, signature: Signature) -> Self {
+        Self {
+            block_size,
+            block_header,
+            transactions,
+            signature
+        }
     }
 
     pub fn get_transactions(&self) -> &Vec<Transaction> {

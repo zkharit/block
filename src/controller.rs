@@ -17,7 +17,7 @@ use crate::validator::Validator;
 use crate::verification_engine;
 use crate::wallet::Wallet;
 
-use crate::constants::{BLOCK_ADDRESS_SIZE, BLOCK_VERSION, COMPRESSED_PUBLIC_KEY_SIZE, DEFAULT_CONFIG_FILE_NAME, LOOSE_CHANGE_RECIPIENT, LOWEST_DENOMINATION_PER_COIN, MAX_TRANSACTIONS_PER_BLOCK, VALIDATOR_ENABLE_RECIPIENT};
+use crate::constants::{BLOCK_ADDRESS_SIZE, BLOCK_VERSION, COMPRESSED_PUBLIC_KEY_SIZE, DEFAULT_CONFIG_FILE_NAME, GENESIS_BLOCK, LOOSE_CHANGE_RECIPIENT, LOWEST_DENOMINATION_PER_COIN, MAX_TRANSACTIONS_PER_BLOCK, VALIDATOR_ENABLE_RECIPIENT};
 
 pub struct Controller {
     config: Config,
@@ -138,6 +138,14 @@ impl Controller {
             blockchain.add_local_genesis_block(&genesis_block);
             println!("Added local blockchain genesis block to blockchain");
             println!();
+
+            return Some(Self {
+                config,
+                blockchain,
+                wallet,
+                validator,
+                network
+            })
         } else {
             // initialize blockchain with typical genesis block
             println!("Adding genesis block to blockchain");
@@ -145,21 +153,27 @@ impl Controller {
             println!("Added genesis block to blockchain");
             println!();
 
-            // restore blockchain from network
-            println!("Restoring Blockchain");
-            // ToDo:
-            // println!("Restored Blockchain: {:X?}", blockchain);
-            println!();
-        }
-
-        Some(
-            Self {
+            // create the controller object
+            let mut controller = Self {
                 config,
                 blockchain,
                 wallet,
                 validator,
                 network
-            })
+            };
+
+            // restore blockchain from network
+            println!("Synchronizing blockchain with network");
+            if !controller.sync_blockchain().await {
+                println!("Unsuccessful in synchronizing blockchain with peers");
+                println!();
+                return None
+            }
+            println!("Synchronized blockchain to height: {}", controller.blockchain_get_block_height());
+            println!();
+
+            return Some(controller)
+        }
     }
 
     pub fn wallet_overview(&self) {
@@ -470,17 +484,136 @@ impl Controller {
         Some(self.validator.create_block(&mut tx_vec, prev_hash, timestamp, block_sig))
     }
 
-    pub fn do_block_things(&mut self) {
-        let block = self.validator_create_block().unwrap();
-
-        let (result, blockchain) = self.blockchain.clone().add_block(&block);
-        
-        if result {
-            self.blockchain = blockchain
-        } else {
-            println!("Failed to add block to blockchain");
-            println!("Blokc: {:?}", block);
-            // println!("Blockchain: {:?}", blockchain);
+    async fn sync_blockchain(&mut self) -> bool {
+        // if there are no valid peers then cannot sync the blockchain
+        if self.network.get_peer_list().len() == 0 {
+            // ToDo: should prompt them to enter a peer ip:port combo in this case
+            println!("No peers to synchronize with, please check your config file");
+            println!();
+            return false;
         }
+
+        let mut tallest_chain_height = 0;
+        let mut tallest_peer = self.network.get_peer_list()[0].clone();
+
+        // find the peer with the tallest chain
+        for peer in self.network.get_peer_list().iter() {
+            match self.network.get_block_height(peer).await {
+                Some(peer_height) => {
+                    if peer_height > tallest_chain_height {
+                        tallest_peer = peer.clone();
+                        tallest_chain_height = peer_height;
+                    }
+                },
+                None => ()
+            };
+        }
+
+        loop {
+            // prompt user if they want to proceed synchronizing with the tallest found peer
+            println!("Synchronizing with tallest peer {}:{} with block height: {}, would you like to proceed? (yes/no)", tallest_peer.get_ip(), tallest_peer.get_port(), tallest_chain_height);
+            let sync_input = read_string().to_lowercase();
+            println!();
+
+            match sync_input.as_str() {
+                "yes" => {
+                    break;
+                },
+                "no" => {
+                    loop {
+                        // prompt user to enter a different peer ip:port combo if they dont want to use the tallest found peer 
+                        println!("Please enter an ipv4:port for a specific peer you'd like to synchronize from or \"exit\" to exit");
+                        let peer_input = read_string().to_lowercase();
+                        println!();
+
+                        match peer_input.as_str() {
+                            "exit" => {
+                                return false;
+                            },
+                            _ => {
+                                // attempt to create a peer from the entered text
+                                let mut new_peer = match Peer::new(&peer_input) {
+                                    Some(new_peer) => new_peer,
+                                    None => {
+                                        println!("Invalid peer ipv4:port entered");
+                                        println!();
+                                        continue;
+                                    }
+                                };
+        
+                                // test peer connection here
+                                if !self.network.ping_peer(&mut new_peer).await {
+                                    println!("Unable to connect to entered peer");
+                                    println!();
+                                    continue;
+                                }
+
+                                // obtain the peers current block height
+                                match self.network.get_block_height(&new_peer).await {
+                                    Some(new_peer_height) => {
+                                        // set the "tallest" height/peer (peer to sync from)
+                                        tallest_chain_height = new_peer_height;
+                                        tallest_peer = new_peer.clone();
+                                        break;
+                                    },
+                                    None => {
+                                        println!("Unable to obtain block height from entered peer");
+                                        println!();
+                                        continue;
+                                    }
+                                };
+                            }
+                        }
+                    }
+                    break;
+                }
+                _ => {
+                    continue
+                }
+            }
+        }
+
+        // obtain the genesis block from the peer
+        let genesis_block = match self.network.get_block(&tallest_peer, 0).await {
+            Some(genesis_block) =>genesis_block,
+            None => {
+                println!("Failed obtaining genesis block from peer: {}:{}", tallest_peer.get_ip(), tallest_peer.get_port());
+                println!();
+                return false;
+            }
+        };
+
+        // confirm the genesis block is the standard genesis block
+        if genesis_block != Block::from(GENESIS_BLOCK.to_vec()).unwrap() {
+            println!("Non-standard genesis block received from peer: {}:{}", tallest_peer.get_ip(), tallest_peer.get_port());
+            println!();
+            return false;
+        }
+
+        // fetch all blocks from block height 1 to tallest_chain blocks from the peer, verify them, and add to blockchain 
+        for i in 1..=tallest_chain_height {
+             // obtain the block from the peer
+            let block = match self.network.get_block(&tallest_peer, i).await {
+                Some(block) => block,
+                None => {
+                    println!("Failed obtaining block at height {} from peer: {}:{}", i, tallest_peer.get_ip(), tallest_peer.get_port());
+                    println!();
+                    return false;
+                }
+            };
+
+            // attempt to add block to the blockchain
+            let (result, blockchain) = self.blockchain.clone().add_block(&block);
+            if !result {
+                println!("Invalid block at height {} received from peer: {}:{}", i, tallest_peer.get_ip(), tallest_peer.get_port());
+                println!();
+                return false;
+            }
+            
+            // set the new blockchain as the blockchain with the added block
+            self.blockchain = blockchain;
+        }
+
+        true
     }
 }

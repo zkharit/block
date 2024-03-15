@@ -3,6 +3,8 @@ package block.block;
 
 service BlockService {
   rpc BroadcastBlock (BroadcastBlockRequest) returns (BroadcastBlockReply);
+  rpc GetBlock (GetBlockRequest) returns (GetBlockReply);
+  rpc GetBlockHeight (GetBlockHeightRequest) returns (GetBlockHeightReply);
 }
 
 message Block {
@@ -37,4 +39,18 @@ message BroadcastBlockRequest {
 
 message BroadcastBlockReply {
   bool ok = 1;
+}
+
+message GetBlockRequest {
+  uint64 block_height = 1;
+}
+
+message GetBlockReply {
+  optional Block block = 1;
+}
+
+message GetBlockHeightRequest {}
+
+message GetBlockHeightReply {
+  uint64 block_height = 1;
 }
