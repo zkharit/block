@@ -1,5 +1,7 @@
 // version of the block node software
 pub const NODE_VERSION: &'static str = "0.1.0";
+// version of the block api
+pub const API_VERSION: &'static str = "0.1.0";
 // version bytes for prefecing addresses with BLoCK
 // also adds a 1 at the end of BLoCK, which isn't necessarily great, but can be used as a kind of visual version number, if later addresses types are generated
 // the last character (1) I dont think is guarnteed though, theoretically a large enough number could make this wrap to a 2 (or maybe not, infeasible to test and not super valuable information at this time)

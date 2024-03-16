@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::{Block, BlockHeader};
 use crate::config::NetworkConfig;
-use crate::constants::{BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, NODE_VERSION};
+use crate::constants::{API_VERSION, BLOCK_ADDRESS_SIZE, COMPRESSED_PUBLIC_KEY_SIZE, NODE_VERSION};
 use crate::transaction::Transaction;
 
 use protoping::ping_service_client::PingServiceClient;
@@ -79,7 +79,8 @@ impl Network {
 
             // create the request
             let request = tonic::Request::new(BroadcastPingRequest {
-                version: String::from(NODE_VERSION),
+                node_version: String::from(NODE_VERSION),
+                api_version: String::from(API_VERSION)
             });
             
             // make the request to the peer and get a response
@@ -92,22 +93,33 @@ impl Network {
                 }
             };
 
-            // ToDo: need an api version vs node version
-
             // parse ping response
 
             // semantic version regex obtained from: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
             // edited to only allow for major.minor.patch, does not allow pre-release, or build-metadata to be present in the version number 
             let version_regex = Regex::new(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$").unwrap();
-            // confirm the version recevied is in proper semver format: https://semver.org
-            if !version_regex.is_match(&response.version) {
-                println!("Invalid version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.version, peer.ip, peer.port);
+            // confirm the node version recevied is in proper semver format: https://semver.org
+            if !version_regex.is_match(&response.node_version) {
+                println!("Invalid node version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.node_version, peer.ip, peer.port);
                 println!();
                 continue
             }
             // confirm the version of the peer that is received is compatible with the current running node software
-            if NODE_VERSION.split(".").collect::<Vec<&str>>()[0] != response.version.split(".").collect::<Vec<&str>>()[0] {
-                println!("Incompatible version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.version, peer.ip, peer.port);
+            if NODE_VERSION.split(".").collect::<Vec<&str>>()[0] != response.node_version.split(".").collect::<Vec<&str>>()[0] {
+                println!("Incompatible node version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.node_version, peer.ip, peer.port);
+                println!();
+                continue
+            }
+
+            // confirm the api version recevied is in proper semver format: https://semver.org
+            if !version_regex.is_match(&response.api_version) {
+                println!("Invalid api version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.api_version, peer.ip, peer.port);
+                println!();
+                continue
+            }
+            // confirm the api version of the peer that is received is compatible with the current running node software
+            if API_VERSION.split(".").collect::<Vec<&str>>()[0] != response.api_version.split(".").collect::<Vec<&str>>()[0] {
+                println!("Incompatible api version ({}) received from peer: {}:{}, removing from peer list. This will not remove this peer from your config file.", response.api_version, peer.ip, peer.port);
                 println!();
                 continue
             }
@@ -134,7 +146,8 @@ impl Network {
 
         // create the request
         let request = tonic::Request::new(BroadcastPingRequest {
-            version: String::from(NODE_VERSION),
+            node_version: String::from(NODE_VERSION),
+            api_version: String::from(API_VERSION),
         });
         
         // make the request to the peer and get a response
@@ -147,22 +160,33 @@ impl Network {
             }
         };
 
-        // ToDo: need an api version vs node version
-
         // parse ping response
 
         // semantic version regex obtained from: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
         // edited to only allow for major.minor.patch, does not allow pre-release, or build-metadata to be present in the version number 
         let version_regex = Regex::new(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$").unwrap();
-        // confirm the version recevied is in proper semver format: https://semver.org
-        if !version_regex.is_match(&response.version) {
-            println!("Invalid node version ({}) received from peer: {}:{}", response.version, peer.ip, peer.port);
+        // confirm the node version recevied is in proper semver format: https://semver.org
+        if !version_regex.is_match(&response.node_version) {
+            println!("Invalid node version ({}) received from peer: {}:{}", response.node_version, peer.ip, peer.port);
             println!();
             return false
         }
-        // confirm the version of the peer that is received is compatible with the current running node software
-        if NODE_VERSION.split(".").collect::<Vec<&str>>()[0] != response.version.split(".").collect::<Vec<&str>>()[0] {
-            println!("Incompatible node version ({}) received from peer: {}:{}", response.version, peer.ip, peer.port);
+        // confirm the node version of the peer that is received is compatible with the current running node software
+        if NODE_VERSION.split(".").collect::<Vec<&str>>()[0] != response.node_version.split(".").collect::<Vec<&str>>()[0] {
+            println!("Incompatible node version ({}) received from peer: {}:{}", response.node_version, peer.ip, peer.port);
+            println!();
+            return false
+        }
+
+        // confirm the api version recevied is in proper semver format: https://semver.org
+        if !version_regex.is_match(&response.api_version) {
+            println!("Invalid api version ({}) received from peer: {}:{}", response.api_version, peer.ip, peer.port);
+            println!();
+            return false
+        }
+        // confirm the api version of the peer that is received is compatible with the current running node software
+        if API_VERSION.split(".").collect::<Vec<&str>>()[0] != response.api_version.split(".").collect::<Vec<&str>>()[0] {
+            println!("Incompatible api version ({}) received from peer: {}:{}", response.api_version, peer.ip, peer.port);
             println!();
             return false
         }
