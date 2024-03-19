@@ -857,10 +857,71 @@ async fn perform_network_options(controller: &mut Controller) {
                 }
             },
             "3" | "3." | "add" | "add peer" => {
+                // prompt user to enter peer information
+                loop {
+                    println!("Enter peer information of the peer to add in ipv4:port format or \"exit\"");
+                    let peer_information = read_string();
+                    println!();
 
+                    if peer_information.to_lowercase() == "exit" {
+                        break;
+                    }
+
+                    let mut peer = match Peer::new(peer_information.as_str()) {
+                        Some(peer) => peer,
+                        None => {
+                            println!("Invalid ipv4:port entered");
+                            println!();
+                            continue;
+                        }
+                    };
+
+                    // ping peer before adding them to the peer list
+                    if !controller.network_ping_peer(&mut peer).await {
+                        println!("Unable to ping peer {}:{}, check your connection and try again", peer.get_ip(), peer.get_port());
+                        println!();
+                    } else {
+                        println!("Successfully pinged peer {}:{}", peer.get_ip(), peer.get_port());
+                        controller.network_add_peer(&peer);
+                        println!("Added peer {}:{} to peer list", peer.get_ip(), peer.get_port());
+                        println!();
+                    }
+                    break;
+                }
             },
             "4" | "4." | "remove" | "remove peer" => {
+                loop {
+                    // display a list of peers to the user and a user enter peer inforamtion option
+                    println!("Choice a peer from the list below to remove or \"exit\"");
+                    for (index, peer) in controller.network_get_peers().iter().enumerate() {
+                        println!("{}. {:?}", index + 1, peer);
+                    }
+                    let total_peers = controller.network_get_peers().len();
+                    let peer_input = read_string().to_lowercase();
+                    println!();
 
+                    if peer_input.to_lowercase() == "exit" {
+                        break;
+                    }
+
+                    // convert user input to an index
+                    let peer_selection = match peer_input.parse::<usize>() {
+                        Ok(peer_selection) => peer_selection,
+                        Err(_) => continue
+                    };
+
+                    // make sure selection is within the range of index's there are peers
+                    if peer_selection > 0 && peer_selection < total_peers + 1 {
+                        let peer = controller.network_get_peers()[peer_selection - 1].clone();
+                        controller.network_remove_peer(&peer);
+                        println!("Successfully removed peer {}:{}", peer.get_ip(), peer.get_port());
+                        break;
+                    } else {
+                        println!("Invalid peer selection entered");
+                        println!();
+                        continue;
+                    }
+                }
             },
             "5" => {
                 break;

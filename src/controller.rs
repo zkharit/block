@@ -287,6 +287,14 @@ impl Controller {
         self.network.ping_peer(peer).await
     }
 
+    pub fn network_add_peer(&mut self, peer: &Peer) {
+        self.network.add_peer(peer);
+    }
+
+    pub fn network_remove_peer(&mut self, peer: &Peer) {
+        self.network.remove_peer(peer)
+    }
+
     pub fn network_get_local_blockchain(&self) -> bool {
         self.network.get_local_blockchain()
     }

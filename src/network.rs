@@ -481,6 +481,28 @@ impl Network {
         }
     }
 
+    pub fn add_peer(&mut self, peer: &Peer) {
+        // make sure the peer is not already in the peer_list
+        for current_peer in &self.peer_list {
+            if current_peer.get_ip() == peer.get_ip() && current_peer.get_port() == peer.get_port() {
+                return
+            }
+        }
+
+        // if the peer is not already in the peer list then add them to it
+        self.peer_list.push(peer.clone());
+    }
+
+    pub fn remove_peer(&mut self, peer: &Peer) {
+        // iterate through the peer list and remove the peer if found
+        for (index, current_peer) in self.peer_list.iter_mut().enumerate() {
+            if current_peer.get_ip() == peer.get_ip() && current_peer.get_port() == peer.get_port() {
+                self.peer_list.remove(index);
+                break;
+            }
+        }
+    }
+
     pub fn get_local_blockchain(&self) -> bool {
         self.config.get_local_blockchain()
     }
