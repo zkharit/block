@@ -279,6 +279,14 @@ impl Controller {
         self.wallet.create_validator_revoke_tx(amount, fee)
     }
 
+    pub fn network_get_peers(&self) -> Vec<Peer> {
+        self.network.get_peer_list()
+    }
+
+    pub async fn network_ping_peer(&mut self, peer: &mut Peer) -> bool {
+        self.network.ping_peer(peer).await
+    }
+
     pub fn network_get_local_blockchain(&self) -> bool {
         self.network.get_local_blockchain()
     }
@@ -615,5 +623,23 @@ impl Controller {
         }
 
         true
+    }
+
+    pub async fn do_block_things(&mut self) {
+        // let peer = Peer::new("127.0.0.1:28475").unwrap();
+        // self.network.get_block_height(&peer).await;
+        let block = self.validator_create_block().unwrap();
+
+        self.network.broadcast_block(&block).await;
+
+        let (result, blockchain) = self.blockchain.clone().add_block(&block);
+        
+        if result {
+            self.blockchain = blockchain
+        } else {
+            println!("Failed to add block to blockchain");
+            println!("Blokc: {:?}", block);
+            // println!("Blockchain: {:?}", blockchain);
+        }
     }
 }

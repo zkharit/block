@@ -14,7 +14,7 @@ mod util;
 
 use std::io::{self, Write};
 
-use crate::controller::Controller;
+use crate::{controller::Controller, network::Peer};
 use crate::util::read_string;
 
 use constants::{BLOCK_ADDRESS_SIZE, LOWEST_DENOMINATION_PER_COIN, NODE_VERSION};
@@ -88,7 +88,7 @@ async fn output_options(controller: &mut Controller) {
                 perform_transaction_options(controller).await;
             },
             "4" | "4." | "network" => {
-                perform_network_options(controller);
+                perform_network_options(controller).await;
             },
             "5" | "5." | "about" => {
                 perform_about_options(controller);
@@ -767,8 +767,107 @@ async fn perform_transaction_options(controller: &mut Controller) {
     }
 }
 
-fn perform_network_options(controller: &Controller) {
-    
+async fn perform_network_options(controller: &mut Controller) {
+    let network_options = vec!["Network Options", "View Peers", "Ping Peer", "Add Peer", "Remove Peer", "Back"];
+
+    loop {
+        // present network options to user
+        print_options(&network_options);
+
+        // get user choice
+        let option_input = read_string().to_lowercase();
+        println!();
+
+        match option_input.as_str() {
+            "1" | "1." | "view" | "view peers" => {
+                println!("Peer list:");
+                println!("{:?}", controller.network_get_peers());
+                println!();
+            },
+            "2" | "2." | "ping" | "ping peer" => {
+                loop {
+                    // display a list of peers to the user and a user enter peer inforamtion option
+                    println!("Choice a peer from the list below or choose other to ping a peer not in the list or \"exit\"");
+                    for (index, peer) in controller.network_get_peers().iter().enumerate() {
+                        println!("{}. {:?}", index + 1, peer);
+                    }
+                    let total_peers = controller.network_get_peers().len();
+                    println!("{}. Enter peer information", total_peers + 1);
+                    let peer_input = read_string().to_lowercase();
+                    println!();
+
+                    if peer_input.to_lowercase() == "exit" {
+                        break;
+                    }
+
+                    // convert user input to an index
+                    let peer_selection = match peer_input.parse::<usize>() {
+                        Ok(fee) => fee,
+                        Err(_) => continue
+                    };
+
+                    if peer_selection > 0 && peer_selection < total_peers + 1 {
+                        // if user input is one of the peers in the peer list
+                        // ping the peer they selected
+                        let mut peer = controller.network_get_peers()[peer_selection - 1].clone();
+
+                        if !controller.network_ping_peer(&mut peer).await {
+                            println!("Unable to ping peer {}:{}", peer.get_ip(), peer.get_port());
+                            println!();
+                        } else {
+                            println!("Successfully pinged peer {}:{}", peer.get_ip(), peer.get_port());
+                            println!();
+                        }
+                        break;
+                    } else if peer_selection == total_peers + 1 {
+                        // if user chose to enter a specific peer's ipv4:port combo
+                        // prompt user to enter peer information
+                        loop {
+                            println!("Enter peer information in ipv4:port format or \"exit\"");
+                            let peer_information = read_string();
+                            println!();
+
+                            if peer_information.to_lowercase() == "exit" {
+                                break;
+                            }
+
+                            let mut peer = match Peer::new(peer_information.as_str()) {
+                                Some(peer) => peer,
+                                None => {
+                                    println!("Invalid ipv4:port entered");
+                                    println!();
+                                    continue;
+                                }
+                            };
+
+                            if !controller.network_ping_peer(&mut peer).await {
+                                println!("Unable to ping peer {}:{}", peer.get_ip(), peer.get_port());
+                                println!();
+                            } else {
+                                println!("Successfully pinged peer {}:{}", peer.get_ip(), peer.get_port());
+                                println!();
+                            }
+                            break;
+                        }
+                        break;
+                    } else {
+                        // if user entered invalid input
+                        continue;
+                    }
+                }
+            },
+            "3" | "3." | "add" | "add peer" => {
+
+            },
+            "4" | "4." | "remove" | "remove peer" => {
+
+            },
+            "5" => {
+                break;
+            },
+            _ => {}
+        }
+    }
 }
 
 fn perform_about_options(controller: &Controller) {
